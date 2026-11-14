@@ -38,6 +38,7 @@ foreach (['/whm/security', '/cpanel/security'] as $sec) {
 
 // WHM (admin + reseller)
 $router->get('/whm', ['WhmDashboardController', 'index']);
+$router->get('/whm/analytics', ['WhmDashboardController', 'analytics']);
 $router->get('/whm/accounts', ['AccountController', 'index']);
 $router->get('/whm/accounts/create', ['AccountController', 'create']);
 $router->post('/whm/accounts', ['AccountController', 'store']);

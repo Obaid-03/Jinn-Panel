@@ -100,7 +100,7 @@ activity log.
 
 ## WHM (admin and reseller)
 
-The sidebar, in order: **Dashboard**, **Accounts**, **Packages**,
+The sidebar, in order: **Dashboard**, **Analytics**, **Accounts**, **Packages**,
 **cPanel Migration**, **Activity Log**; then, for the admin only, a
 **Server Config** section: **Backups**, **DNS Zones**, **Mail Settings**,
 **SFTP Settings**, **PHP Settings**, **PHP Extensions**, **PHP Versions**,
@@ -109,14 +109,23 @@ admin-only page.
 
 ### Dashboard
 
-- Counters: **Resellers** (admin only), **Hosting Accounts**, **Domains
-  Hosted**, **Suspended** - a reseller's counts cover only its own accounts.
+- The page's description says whether every service answers and counts
+  hosting accounts, domains, suspended accounts and resellers (a
+  reseller's counts cover only its own accounts).
+- **Traffic**: requests to every site (a reseller's: its accounts' sites)
+  over the last 24 hours, 7 days or 30 days, stacked for the four busiest
+  sites of the last 30 days plus "Other sites", the total and its change on
+  the previous period, and a note on an unusual spike. The range links
+  reload only this chart. Every chart has a table view.
+- Admin only, under the chart: **CPU load**, **Memory**, **Disk** and
+  **Sent this month**, each with its trend.
+- **Busiest sites** of the range; admin only: **Services** - each service's
+  last 24 hours in 30-minute blocks from the minute-by-minute checks, its
+  uptime and when it was down; **Nearing their limits** - accounts over or
+  close to their disk or bandwidth, with the day they reach it at the
+  current rate.
 - Admin only: **Needs attention** - the top five alerts (see
   [Alerts](#alerts-admin)), or "All clear".
-- Admin only: **Server** (disk use of `/`, memory, load against the CPU
-  count, uptime) and **Services** (MariaDB, FrankenPHP, Stalwart, SFTPGo,
-  Knot shown running or not answering by whether their port accepts a
-  connection).
 - **Recent activity** - the last eight entries of the activity log (a
   reseller sees its own and its accounts').
 - Admin only: **Live logs** - pick MariaDB, FrankenPHP, Stalwart, SFTPGo,
@@ -126,12 +135,25 @@ admin-only page.
   snapshot.
 - **Create account** in the page header.
 
+### Analytics
+
+Requests, visitors or data sent (pick one) for every site - a reseller's
+accounts' sites - over 24 hours, 7 days or 30 days; for the admin, the
+server's CPU and memory and all the data it sent; and a table of every
+site with requests, visitors, data sent, server errors (5xx) and average
+page time, sortable by each. Numbers come from the web server's access
+log, read every 5 minutes (see [ARCHITECTURE.md](ARCHITECTURE.md#statistics));
+no IP address is stored.
+
 ### Accounts
 
 Lists hosting accounts (and, for the admin, resellers and administrators)
-with package, owning reseller (admin view), disk use, domain count, quota
-warnings and status, a filter box, **Log in as** for active hosting
-accounts and **Manage**.
+25 to a page, with package, owning reseller (admin view), disk use against
+the package, requests over the last 14 days with a trend line, domain count,
+quota warnings and status, **Log in as** for active hosting accounts and
+**Manage**. Search by name, email or domain; filter by status (with
+counts), type, package and reseller; sort by name, disk, requests, domains
+or age. All of it is in the address, so a filtered list can be bookmarked.
 
 **Several at once**: tick accounts (or all that match the filter), then
 **Change package**, **Suspend**, **Unsuspend** or **Switch a feature**

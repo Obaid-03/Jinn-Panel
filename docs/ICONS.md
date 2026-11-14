@@ -69,8 +69,10 @@ The panel's interface uses a small hand-authored set of stroke icons (24x24, `st
 | menu | `menu.svg` | Mobile menu |
 | close | `close.svg` | Close, remove |
 | chevron-right | `chevron-right.svg` | Breadcrumbs, "more" links |
+| chevron-left | `chevron-left.svg` | Previous page |
 | chevron-down | `chevron-down.svg` | Menus, disclosures |
 | arrow-left | `arrow-left.svg` | Back |
+| arrow-up | `arrow-up.svg` | More / less than before (rotated) |
 | home | `home.svg` | Home, website folder |
 | more | `more.svg` | (reserved: overflow menus) |
 | terminal | `terminal.svg` | (reserved) |

@@ -2,6 +2,7 @@
 $nav = [
     ['label' => null, 'items' => [
         ['href' => '/whm', 'label' => 'Dashboard', 'icon' => 'grid'],
+        ['href' => '/whm/analytics', 'label' => 'Analytics', 'icon' => 'chart'],
     ]],
     ['label' => 'Accounts', 'items' => [
         ['href' => '/whm/accounts', 'label' => 'Accounts', 'icon' => 'users'],

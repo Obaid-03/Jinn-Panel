@@ -87,3 +87,147 @@ function stats_accounts(): array
     }
     return $out;
 }
+
+// ---------------------------------------------------------------------------
+// The shapes StatsService returns, from the samples above (fixtures).
+
+function stats_range(): string
+{
+    return in_array($_GET['range'] ?? '', ['24h', '7d', '30d'], true) ? $_GET['range'] : '24h';
+}
+
+/** StatsService::traffic() */
+function stats_fx_traffic(?string $range = null, string $metric = 'requests'): array
+{
+    $range ??= stats_range();
+    $t = stats_traffic($range);
+    $mult = $metric === 'visitors' ? 0.18 : ($metric === 'bytes' ? 52000 : 1);
+    $stacks = array_map(fn($c) => array_map(fn($v) => round($v * $mult), $c), $t['stacks']);
+    $total = array_sum(array_map('array_sum', $stacks));
+    $usual = array_sum(array_column($stacks, 0)) / count($stacks);
+    $busiest = [];
+    foreach ($t['series'] as $k => $s) {
+        if ($s['series'] !== 'so') {
+            $busiest[] = ['id' => $k + 1, 'domain_name' => $s['name'], 'username' => $k < 2 ? 'acme' : 'bakery', 'n' => array_sum(array_column($stacks, $k))];
+        }
+    }
+    foreach ([['lumen.example', 0.09], ['juno.example', 0.06], ['harbour.example', 0.04]] as $i => [$name, $f]) {
+        $busiest[] = ['id' => 10 + $i, 'domain_name' => $name, 'username' => explode('.', $name)[0], 'n' => round($total * $f)];
+    }
+    usort($busiest, fn($a, $b) => $b['n'] <=> $a['n']);
+    return [
+        'range' => $range, 'per' => ['24h' => 'hour', '7d' => '4 hours', '30d' => 'day'][$range], 'labels' => $t['labels'], 'series' => $t['series'], 'stacks' => $stacks,
+        'total' => $total, 'previous' => $total / 1.12, 'spike' => [$t['spike'], 'shop.acme.test ' . number_format($stacks[$t['spike']][0] / $usual, 1) . '× usual'],
+        'busiest' => array_slice($busiest, 0, 7), 'metric' => $metric,
+    ];
+}
+
+/** StatsService::server() */
+function stats_fx_server(): array
+{
+    $bw = stats_series(9, 14, 120e9, 0.3, 0.4);
+    return [
+        'cpu' => array_map(fn($v) => $v * 40, stats_series(7, 48, 0.6, 0.5)),
+        'mem' => stats_series(8, 48, 58, 0.08),
+        'load' => stats_series(7, 48, 0.6, 0.5),
+        'latest' => null,
+        'bwDays' => $bw,
+        'bwMonth' => array_sum($bw),
+    ];
+}
+
+/** StatsService::serverRange() */
+function stats_fx_server_range(?string $range = null): array
+{
+    $range ??= stats_range();
+    $n = ['24h' => 24, '7d' => 42, '30d' => 30][$range];
+    $labels = stats_traffic($range)['labels'];
+    return [
+        'labels' => $labels, 'per' => ['24h' => 'hour', '7d' => '4 hours', '30d' => 'day'][$range],
+        'cpu' => array_map(fn($v) => min(100, $v * 40), stats_series(17, $n, 0.6, 0.5)),
+        'mem' => stats_series(18, $n, 58, 0.08),
+        'load' => stats_series(17, $n, 0.6, 0.5),
+        'tx' => stats_series(19, $n, 4e9, 0.3),
+        'has' => true,
+    ];
+}
+
+/** StatsService::uptime() */
+function stats_fx_uptime(): array
+{
+    $up = array_fill(0, 48, 'up');
+    $sftp = array_merge(array_fill(0, 40, 'up'), ['down', 'down', 'down'], array_fill(0, 5, 'up'));
+    $mail = array_merge(array_fill(0, 30, 'up'), ['slow'], array_fill(0, 17, 'up'));
+    return [
+        'mariadb' => ['cells' => $up, 'pct' => 100.0, 'down' => '', 'checks' => 1440],
+        'frankenphp' => ['cells' => $up, 'pct' => 100.0, 'down' => '', 'checks' => 1440],
+        'stalwart' => ['cells' => $mail, 'pct' => 99.93, 'down' => '', 'checks' => 1440],
+        'sftpgo' => ['cells' => $sftp, 'pct' => 93.75, 'down' => 'down from 12:00 to 13:30', 'checks' => 1440],
+        'knot' => ['cells' => $up, 'pct' => 100.0, 'down' => '', 'checks' => 1440],
+    ];
+}
+
+/** StatsService::nearingLimits() */
+function stats_fx_limits(): array
+{
+    return [
+        ['id' => 12, 'username' => 'bakery', 'what' => 'Disk', 'pct' => 108.0, 'note' => 'Over since 9 Nov', 'tone' => 'danger', 'over' => true, 'days' => 0],
+        ['id' => 10, 'username' => 'acme', 'what' => 'Bandwidth', 'pct' => 82.4, 'note' => 'Runs out around 24 Nov at this pace', 'tone' => 'warning', 'over' => false, 'days' => 10],
+        ['id' => 14, 'username' => 'clinicnorth', 'what' => 'Disk', 'pct' => 86.0, 'note' => 'Full around 2 Dec', 'tone' => 'accent', 'over' => false, 'days' => 18],
+    ];
+}
+
+/** StatsService::sites() */
+function stats_fx_sites(): array
+{
+    $out = [];
+    foreach (stats_fx_traffic()['busiest'] as $i => $b) {
+        $out[] = ['id' => $b['id'], 'domain_name' => $b['domain_name'], 'username' => $b['username'], 'requests' => $b['n'], 'visitors' => round($b['n'] * 0.18),
+            'bytes' => $b['n'] * 52000, 'errors' => $i === 1 ? 312 : round($b['n'] * 0.002), 'avg_ms' => [182, 640, 95, 240, 130, 75, 410][$i] ?? 150];
+    }
+    return $out;
+}
+
+/** StatsService::accountHistory() */
+function stats_fx_account_history(float $limitBytes, float $from = 0.55, float $to = 0.82): array
+{
+    $labels = $disk = $files = $db = $mail = $bw = $req = [];
+    $r = stats_rand(77);
+    for ($i = 29; $i >= 0; $i--) {
+        $labels[] = date('j M', strtotime('2026-11-14') - $i * 86400);
+        $f = 1 - $i / 29;
+        $d = $limitBytes * ($from + ($to - $from) * $f) * $r(0.99, 1.01);
+        $disk[] = round($d);
+        $files[] = round($d * 0.7);
+        $db[] = round($d * 0.2);
+        $mail[] = round($d * 0.1);
+        $bw[] = round(1.4e9 * $r(0.6, 1.4) * (1 + $f * 0.5));
+        $req[] = round(9000 * $r(0.6, 1.4));
+    }
+    return ['labels' => $labels, 'disk' => $disk, 'files' => $files, 'db' => $db, 'mail' => $mail, 'bw' => $bw, 'requests' => $req, 'has' => true];
+}
+
+/** StatsService::domain() */
+function stats_fx_domain(?string $range = null): array
+{
+    $range ??= stats_range();
+    $t = stats_traffic($range);
+    $req = array_map(fn($c) => $c[0] + $c[1] * 0.3, $t['stacks']);
+    $vis = array_map(fn($v) => round($v * 0.17), $req);
+    $pages = array_map(fn($v) => round($v * 0.32), $req);
+    $r = stats_rand(5);
+    $time = array_map(fn($v) => round(160 + 90 * $r(0, 1) + ($v > 6000 ? 300 : 0)), $req);
+    $status = array_map(fn($v) => [round($v * 0.91), round($v * 0.05), round($v * 0.035), round($v * ($r(0, 1) > 0.9 ? 0.02 : 0.003))], $req);
+    $sum = ['requests' => array_sum($req), 'bytes' => array_sum($req) * 48000, 'visitors' => array_sum($vis), 'pages' => array_sum($pages),
+        's2xx' => array_sum(array_column($status, 0)), 's3xx' => array_sum(array_column($status, 1)), 's4xx' => array_sum(array_column($status, 2)), 's5xx' => array_sum(array_column($status, 3)),
+        'time_ms' => array_sum(array_map(fn($p, $t) => $p * $t, $pages, $time)), 'slow' => round(array_sum($pages) * 0.012)];
+    $prev = array_map(fn($v) => $v / 1.09, $sum);
+    return [
+        'range' => $range, 'per' => ['24h' => 'hour', '7d' => '4 hours', '30d' => 'day'][$range], 'labels' => $t['labels'],
+        'series' => ['requests' => $req, 'visitors' => $vis, 'bytes' => array_map(fn($v) => $v * 48000, $req), 'pages' => $pages, 'time' => $time, 'status' => $status],
+        'sum' => $sum, 'prev' => $prev,
+        'pages' => [['/', 18200], ['/shop', 9400], ['/shop/cart', 3100], ['/products/sourdough', 2650], ['/about', 1640], ['/blog/opening-hours', 980], ['/contact', 620]],
+        'referrers' => [['google.com', 5300], ['facebook.com', 1500], ['duckduckgo.com', 1350], ['news.example.org', 790], ['bing.com', 310]],
+        'since' => '2026-08-01 00:00:00',
+    ];
+}

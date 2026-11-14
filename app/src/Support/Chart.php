@@ -43,6 +43,17 @@ final class Chart
         return [round($step * $steps, 10), $ticks];
     }
 
+    /** scale() in the unit the axis will show: bytes step in KB/MB/GB (powers of 1024), so ticks read 2 GB, not 1.9 GB. @return array{0:float,1:list<float>} */
+    public static function scaleFor(float $max, string $fmt): array
+    {
+        if ($fmt !== 'bytes' || $max < 1024) {
+            return self::scale($max);
+        }
+        $unit = 1024 ** min(5, (int) floor(log($max, 1024)));
+        [$top, $ticks] = self::scale($max / $unit);
+        return [$top * $unit, array_map(fn($t) => $t * $unit, $ticks)];
+    }
+
     /** 1,284 / 12.9K / 3.4M / 1.2B: four characters or so, for axes and tight cells. */
     public static function compact(float $n): string
     {
@@ -117,8 +128,9 @@ final class Chart
     /**
      * Lines over time with a y-axis, x labels and a crosshair (one series can
      * be an area). $o: height (px), area (bool), fmt (FORMATS), xEvery (label
-     * every n points), max (fixed axis top, e.g. 100 for percent), table
-     * (heading of the first column, or false for no table view).
+     * every n points), max (fixed axis top, e.g. 100 for percent), ref
+     * ([value, label]: a dashed limit line), table (heading of the first
+     * column, or false for no table view).
      *
      * @param list<array{name:string, values:list<float|int>, series?:string}> $series
      * @param list<string> $labels
@@ -135,7 +147,8 @@ final class Chart
         $fmt = self::fmtOf($o);
         $series = self::withClasses($series);
         $all = array_merge(...array_map(fn($s) => array_map('floatval', $s['values']), $series));
-        [$max, $ticks] = isset($o['max']) ? [(float) $o['max'], array_map(fn($i) => $o['max'] * $i / 4, range(0, 4))] : self::scale((float) max($all ?: [0]));
+        $top = max(array_merge($all, [0.0, isset($o['ref'][0]) ? (float) $o['ref'][0] * 1.08 : 0.0]));
+        [$max, $ticks] = isset($o['max']) ? [(float) $o['max'], array_map(fn($i) => $o['max'] * $i / 4, range(0, 4))] : self::scaleFor((float) $top, $fmt);
         $yOf = fn(float $v) => round(100 - min($v, $max) / $max * 100, 3);
 
         $svg = '';
@@ -158,9 +171,13 @@ final class Chart
             'y' => array_map(fn($v) => $yOf((float) $v), array_values($s['values'])),
         ], $series)];
 
-        $html = self::open($label, $h, $data) . self::grid($ticks, $max, $fmt);
+        $html = self::open($label, $h, $data, $fmt) . self::grid($ticks, $max, $fmt);
         $every = (int) ($o['xEvery'] ?? max(1, (int) ceil($n / 6)));
         $html .= self::xLabels($labels, $every, fn($i) => $i / max(1, $n - 1) * 100);
+        if (isset($o['ref'][0], $o['ref'][1])) {
+            // A limit to compare against: a dashed line with its name (not colour alone).
+            $html .= '<div class="chart-ref" style="top:' . $yOf((float) $o['ref'][0]) . '%"><span>' . e((string) $o['ref'][1]) . '</span></div>';
+        }
         $html .= '<svg class="absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">' . $svg . '</svg>';
         foreach ($series as $s) {
             $last = (float) (array_values($s['values'])[$n - 1] ?? 0);
@@ -194,7 +211,7 @@ final class Chart
         View::script('charts');
         $fmt = self::fmtOf($o);
         $series = self::withClasses($series);
-        [$max, $ticks] = self::scale((float) max(array_map(fn($c) => array_sum(array_map('floatval', $c)), $stacks)));
+        [$max, $ticks] = self::scaleFor((float) max(array_map(fn($c) => array_sum(array_map('floatval', $c)), $stacks)), $fmt);
         $data = [
             'kind' => 'columns',
             'labels' => $labels,
@@ -206,7 +223,7 @@ final class Chart
             'totals' => count($series) > 1 ? array_map(fn($col) => self::format((float) array_sum($col), $fmt), $stacks) : null,
         ];
 
-        $html = self::open($label, $h, $data) . self::grid($ticks, $max, $fmt);
+        $html = self::open($label, $h, $data, $fmt) . self::grid($ticks, $max, $fmt);
         $html .= '<div class="absolute inset-0 flex items-stretch gap-[2px]">';
         foreach ($stacks as $i => $col) {
             $html .= '<div class="chart-col" data-i="' . $i . '">';
@@ -219,7 +236,7 @@ final class Chart
             $html .= '</div>';
         }
         $html .= '</div>';
-        $every = (int) ($o['xEvery'] ?? max(1, (int) ceil($n / 8)));
+        $every = (int) ($o['xEvery'] ?? max(1, (int) ceil($n / 7)));
         $html .= self::xLabels($labels, $every, fn($i) => ($i + 0.5) / $n * 100);
         if (isset($o['annotate'][0], $stacks[$o['annotate'][0]])) {
             [$ai, $text] = $o['annotate'];
@@ -384,11 +401,13 @@ final class Chart
         return in_array($f, self::FORMATS, true) ? $f : 'compact';
     }
 
-    private static function open(string $label, int $h, array $data): string
+    private static function open(string $label, int $h, array $data, string $fmt = 'compact'): string
     {
+        // Room for the y-axis labels: "7.5 GB" and "1.2 s" are wider than "20K".
+        $left = in_array($fmt, ['bytes', 'ms'], true) ? 60 : 48;
         return '<div class="chart" style="height:' . $h . 'px" role="img" tabindex="0" aria-label="' . e($label . '. ' . t('Use the arrow keys to read values.')) . '" data-chart="'
             . e((string) json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . '">'
-            . '<div class="chart-plot" style="left:48px;right:4px;top:6px;bottom:26px" data-chart-plot>';
+            . '<div class="chart-plot" style="left:' . $left . 'px;right:4px;top:6px;bottom:26px" data-chart-plot>';
     }
 
     /** @param list<float> $ticks */

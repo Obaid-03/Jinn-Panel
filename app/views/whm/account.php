@@ -7,6 +7,10 @@
 /** @var array<string,bool> $pkgFeatures its package's features */
 /** @var array<string,bool> $overrides its own feature switches */
 /** @var array<string,mixed>|null $alloc reseller allocation (resellers) */
+/** @var array<string,mixed>|null $history StatsService::accountHistory() (hosting accounts) */
+/** @var array<string,array> $projection disk / bw => StatsService::*Projection() */
+$history ??= null;
+$projection ??= [];
 $id = (int) $a['id'];
 $user = $a['role'] === 'user';
 $pkg = $o['package'];
@@ -57,6 +61,31 @@ $roleLabel = ['admin' => 'Administrator', 'reseller' => 'Reseller', 'user' => 'H
                 <?php endif; ?>
             </div>
         </section>
+
+        <?php if ($history !== null && $pkg): ?>
+        <section class="card" aria-labelledby="history-title">
+            <?= Ui::cardHeader('Last 30 days', $history['has'] ? 'Disk use each day, and what its sites sent each day.' : 'History starts with the next hourly measure.', id: 'history-title') ?>
+            <?php if ($history['has']): ?>
+            <div class="grid grid-cols-1 divide-y divide-line lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+                <div class="p-5">
+                    <h3 class="text-[13px] font-medium text-fg">Disk</h3>
+                    <p class="mt-0.5 text-[12.5px] <?= ($projection['disk']['days'] ?? null) === 0 ? 'text-danger-text' : (($projection['disk']['days'] ?? 999) <= 30 ? 'text-warning-text' : 'text-muted') ?>"><?= e($projection['disk']['note'] ?? 'No limit') ?></p>
+                    <div class="mt-4">
+                        <?php $diskLimit = Quota::bytes($pkg['disk_quota_mb']); ?>
+                        <?= Chart::line([['name' => 'Disk used', 'values' => $history['disk']]], $history['labels'], 'Disk used per day, last 30 days', ['area' => true, 'fmt' => 'bytes', 'height' => 180, 'xEvery' => 7, 'table' => 'Day'] + ($diskLimit > 0 ? ['ref' => [$diskLimit, 'Limit ' . fmt_bytes($diskLimit)]] : [])) ?>
+                    </div>
+                </div>
+                <div class="p-5">
+                    <h3 class="text-[13px] font-medium text-fg">Data sent by its sites</h3>
+                    <p class="mt-0.5 text-[12.5px] <?= ($projection['bw']['days'] ?? null) === 0 ? 'text-danger-text' : (($projection['bw']['days'] ?? null) !== null ? 'text-warning-text' : 'text-muted') ?>"><?= e($projection['bw']['note'] ?? 'No monthly limit') ?></p>
+                    <div class="mt-4">
+                        <?= Chart::columns([['name' => 'Sent']], array_map(fn($v) => [$v], $history['bw']), $history['labels'], 'Data sent by its sites per day, last 30 days', ['fmt' => 'bytes', 'height' => 180, 'xEvery' => 7, 'table' => 'Day']) ?>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+        </section>
+        <?php endif; ?>
 
         <section class="card scroll-mt-20" id="features" aria-labelledby="features-title">
             <?= Ui::cardHeader('Package and features', 'Limits come from the package. Each feature follows the package unless it is switched for this account.', '', id: 'features-title') ?>

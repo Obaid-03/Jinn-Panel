@@ -8,8 +8,9 @@ final class WhmDashboardController
         Auth::requireRole(['admin', 'reseller']);
         $user = Auth::user();
         $pdo = Database::app();
+        $admin = $user['role'] === 'admin';
 
-        if ($user['role'] === 'admin') {
+        if ($admin) {
             $resellerCount = (int) $pdo->query("SELECT COUNT(*) c FROM users WHERE role='reseller'")->fetch()['c'];
             $userCount = (int) $pdo->query("SELECT COUNT(*) c FROM users WHERE role='user'")->fetch()['c'];
             $domainCount = (int) $pdo->query('SELECT COUNT(*) c FROM domains')->fetch()['c'];
@@ -24,7 +25,6 @@ final class WhmDashboardController
             $domainCount = (int) $stmt->fetch()['c'];
         }
 
-        $admin = $user['role'] === 'admin';
         $recent = $pdo->prepare(
             'SELECT a.created_at, a.action, a.detail, actor.username AS actor_name, target.username AS target_name
              FROM activity_log a LEFT JOIN users actor ON actor.id = a.actor_id LEFT JOIN users target ON target.id = a.target_user_id'
@@ -33,9 +33,16 @@ final class WhmDashboardController
         );
         $recent->execute($admin ? [] : [$user['id'], $user['id']]);
 
+        $range = StatsService::range($_GET['range'] ?? null);
+        $scope = $admin ? [] : ['reseller' => (int) $user['id']];
         View::render('whm/dashboard', [
             'title' => 'Dashboard',
             'me' => $user,
+            'range' => $range,
+            'traffic' => self::safe(fn() => StatsService::traffic($range, $scope)),
+            'server' => $admin ? self::safe(fn() => StatsService::server(12)) : null,
+            'uptime' => $admin ? self::safe(fn() => StatsService::uptime(24, 30)) : null,
+            'limits' => self::safe(fn() => StatsService::nearingLimits($admin ? null : (int) $user['id'])) ?? [],
             'resellerCount' => $resellerCount,
             'userCount' => $userCount,
             'domainCount' => $domainCount,
@@ -47,6 +54,39 @@ final class WhmDashboardController
             'logServices' => $admin ? self::logServices() : [],
             'selectedLog' => (string) ($_GET['log'] ?? 'frankenphp'),
             'logContent' => $admin ? self::readLog((string) ($_GET['log'] ?? 'frankenphp')) : null,
+        ], 'whm');
+    }
+
+    /** Statistics are extra: without their tables (an update not yet migrated) the page still works. */
+    private static function safe(callable $fn): mixed
+    {
+        try {
+            return $fn();
+        } catch (PDOException $e) {
+            error_log('statistics: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /** WHM > Analytics: traffic of every site (or a reseller's), the server over time, a table of sites. */
+    public static function analytics(): void
+    {
+        Auth::requireRole(['admin', 'reseller']);
+        $user = Auth::user();
+        $admin = $user['role'] === 'admin';
+        $range = StatsService::range($_GET['range'] ?? null);
+        $metric = in_array($_GET['metric'] ?? '', ['requests', 'visitors', 'bytes'], true) ? $_GET['metric'] : 'requests';
+        $sort = in_array($_GET['sort'] ?? '', ['name', 'requests', 'visitors', 'bytes', 'errors', 'time'], true) ? $_GET['sort'] : $metric;
+        $scope = $admin ? [] : ['reseller' => (int) $user['id']];
+        View::render('whm/analytics', [
+            'title' => 'Analytics',
+            'me' => $user,
+            'range' => $range,
+            'metric' => $metric,
+            'sort' => $sort,
+            'traffic' => self::safe(fn() => StatsService::traffic($range, $scope, $metric)),
+            'server' => $admin ? self::safe(fn() => StatsService::serverRange($range)) : null,
+            'sites' => self::safe(fn() => StatsService::sites($range, $scope, $sort)) ?? [],
         ], 'whm');
     }
 

@@ -157,7 +157,7 @@ tooltip and arrow-key reading. Every chart has a "Show as table" view.
 
 | Helper | |
 |---|---|
-| `Chart::line($series, $labels, $label, [...])` | lines over time; one series can be an `area`. `fmt`, `max` (fixed top, e.g. 100 for percent), `height`, `xEvery`, `table` (first column heading, or `false`) |
+| `Chart::line($series, $labels, $label, [...])` | lines over time; one series can be an `area`. `fmt`, `max` (fixed top, e.g. 100 for percent), `ref` (`[value, 'Limit 5 GB']`: a dashed limit line), `height`, `xEvery`, `table` (first column heading, or `false`) |
 | `Chart::columns($series, $stacks, $labels, $label, [...])` | stacked columns per time bucket, with a total in the tooltip; `annotate => [index, text]` marks one column |
 | `Chart::sparkline($values, $label, [...])` | a small trend for a table row or a stat; `series`, `area`, `height` |
 | `Chart::ring($pct, $label, [...])` | one share of a limit; `tone` accent / warning / danger |
@@ -166,6 +166,11 @@ tooltip and arrow-key reading. Every chart has a "Show as table" view.
 | `Chart::legend($series, $lines)`, `Chart::table(...)` | legend for two or more series; the table view on its own |
 | `Chart::ranges([...], $current, $label)` | 24 hours / 7 days / 30 days links; inside `data-chart-region="name"` only that region reloads |
 | `Chart::format($v, 'count'\|'compact'\|'bytes'\|'pct'\|'load'\|'ms')`, `compact`, `bytes`, `scale` | the number formats the axes and tooltips use |
+
+The shared traffic panel (`partials/traffic_panel.php`) and the queries
+behind it (`StatsService`) serve the WHM dashboard, WHM > Analytics and the
+customer dashboard. A byte axis steps in KB / MB / GB, so ticks read 2 GB,
+not 1.9 GB.
 
 `$label` is what a screen reader hears for the chart: say what it shows
 ("Requests per hour by site"). Series are `['name' => ..., 'values' =>

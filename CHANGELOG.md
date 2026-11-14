@@ -8,7 +8,7 @@ have been cut) - entries are grouped by development milestone instead.
 ## Unreleased - redesign and account basics (2026-11)
 
 Upgrade by re-running the installer: it applies
-`app/migrations/023_accounts_notifications.sql`, `024_package_features.sql` and `025_reseller_limits_notices.sql`, rebuilds the CSS and
+`app/migrations/023_accounts_notifications.sql`, `024_package_features.sql`, `025_reseller_limits_notices.sql` and `026_statistics.sql`, rebuilds the CSS and
 re-deploys the worker and pool agent (the file editor and hourly alert
 emails need both).
 
@@ -33,6 +33,25 @@ emails need both).
 - No inline scripts left: the Content-Security-Policy no longer allows
   `'unsafe-inline'` scripts.
 - An expired form shows a page that explains it, not a line of text.
+
+### Added - statistics (Plan 1 v3)
+- The root worker collects statistics: the server and each service every
+  minute, the web access log every 5 minutes (requests, visitors, pages,
+  status codes, page time, top pages and referrers per site), each
+  account's disk use daily. No IP address is stored: visitors are counted
+  with a hash whose salt changes daily and is then deleted.
+- **WHM dashboard**: traffic of the busiest sites over 24 hours, 7 or 30
+  days, the server's figures with trends, services' uptime over 24 hours,
+  and accounts nearing a limit with the day they reach it.
+- **WHM > Analytics**: requests, visitors or data sent per site, the
+  server's CPU, memory and network over time, and a sortable table of sites.
+- **Account page**: disk use and data sent over the last 30 days against
+  the package, and when each limit will be reached at the current rate.
+- **Accounts list**: search, filters with counts, sorting and pages in the
+  database (fast with thousands of accounts), a 14-day requests trend per
+  account.
+- Charts are drawn on the server (`Chart::`), readable without JavaScript,
+  each with a table view; a new type scale (IBM Plex, bundled) and accent.
 
 ### Added
 - **WHM > Accounts > account page**: usage against the package, domains,

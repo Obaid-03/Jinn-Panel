@@ -47,7 +47,9 @@ printf("ingest: %d lines in %.1f s (parse + database)\n", $r['lines'], $r['secon
 $bw = StatsCollector::takeBandwidth();
 foreach ($pdo->query("SELECT u.id, GROUP_CONCAT(d.domain_name) names FROM users u JOIN domains d ON d.user_id = u.id GROUP BY u.id")->fetchAll() as $u) {
     $bytes = array_sum(array_map(fn($n) => $bw[$n] ?? 0, explode(',', (string) $u['names'])));
-    $month = (int) $pdo->query("SELECT COALESCE(SUM(bw_bytes), 0) FROM stat_account_daily WHERE user_id = {$u['id']} AND day >= DATE_FORMAT(CURDATE(), '%Y-%m-01')")->fetchColumn();
+    $m = $pdo->prepare('SELECT COALESCE(SUM(bw_bytes), 0) FROM stat_account_daily WHERE user_id = ? AND day >= ?');
+    $m->execute([$u['id'], date('Y-m-01')]);
+    $month = (int) $m->fetchColumn();
     $pdo->prepare("INSERT INTO account_usage (user_id, bw_month, bw_bytes, updated_at) VALUES (?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE bw_month = VALUES(bw_month), bw_bytes = VALUES(bw_bytes), updated_at = NOW()")
         ->execute([$u['id'], date('Y-m'), $month]);
 }
@@ -86,9 +88,9 @@ foreach ($pdo->query("SELECT u.id, u.username, COALESCE(p.disk_quota_mb, 0) q FR
     for ($d = $days * 2; $d >= 0; $d--) {
         $f = 1 - $d / ($days * 2);
         $disk = (int) ($from + ($to - $from) * $f + $noise($limit * 0.01));
-        $pdo->prepare('INSERT INTO stat_account_daily (user_id, day, disk_bytes, files_bytes, db_bytes, mail_bytes) VALUES (?, CURDATE() - INTERVAL ? DAY, ?, ?, ?, ?)
+        $pdo->prepare('INSERT INTO stat_account_daily (user_id, day, disk_bytes, files_bytes, db_bytes, mail_bytes) VALUES (?, ?, ?, ?, ?, ?)
                        ON DUPLICATE KEY UPDATE disk_bytes = VALUES(disk_bytes), files_bytes = VALUES(files_bytes), db_bytes = VALUES(db_bytes), mail_bytes = VALUES(mail_bytes)')
-            ->execute([$u['id'], $d, $disk, (int) ($disk * 0.7), (int) ($disk * 0.2), (int) ($disk * 0.1)]);
+            ->execute([$u['id'], date('Y-m-d', strtotime("-$d day")), $disk, (int) ($disk * 0.7), (int) ($disk * 0.2), (int) ($disk * 0.1)]);
     }
     $pdo->prepare('INSERT INTO account_usage (user_id, files_bytes, db_bytes, mail_bytes, updated_at) VALUES (?, ?, ?, ?, NOW())
                    ON DUPLICATE KEY UPDATE files_bytes = VALUES(files_bytes), db_bytes = VALUES(db_bytes), mail_bytes = VALUES(mail_bytes), updated_at = NOW()')

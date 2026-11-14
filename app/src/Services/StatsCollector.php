@@ -165,9 +165,9 @@ final class StatsCollector
 
     public static function recordDisk(int $userId, int $files, int $db, int $mail): void
     {
-        Database::app()->prepare('INSERT INTO stat_account_daily (user_id, day, disk_bytes, files_bytes, db_bytes, mail_bytes) VALUES (?, CURDATE(), ?, ?, ?, ?)
+        Database::app()->prepare('INSERT INTO stat_account_daily (user_id, day, disk_bytes, files_bytes, db_bytes, mail_bytes) VALUES (?, ?, ?, ?, ?, ?)
                                   ON DUPLICATE KEY UPDATE disk_bytes = VALUES(disk_bytes), files_bytes = VALUES(files_bytes), db_bytes = VALUES(db_bytes), mail_bytes = VALUES(mail_bytes)')
-            ->execute([$userId, $files + $db + $mail, $files, $db, $mail]);
+            ->execute([$userId, date('Y-m-d'), $files + $db + $mail, $files, $db, $mail]);
     }
 
     // -----------------------------------------------------------------------
@@ -176,17 +176,27 @@ final class StatsCollector
     public static function prune(callable $log): void
     {
         $pdo = Database::app();
+        // PHP's clock, not NOW(): rows hold PHP's local time (the database's zone may differ).
+        $today = date('Y-m-d');
+        $days = fn(int $n) => date('Y-m-d', strtotime("-$n day"));
         $n = 0;
-        $n += $pdo->exec('DELETE FROM stat_server WHERE at < NOW() - INTERVAL ' . self::KEEP_SERVER_DAYS . ' DAY');
-        $n += $pdo->exec('DELETE FROM stat_service_checks WHERE at < NOW() - INTERVAL ' . self::KEEP_SERVER_DAYS . ' DAY');
-        $n += $pdo->exec('DELETE FROM stat_domain_hourly WHERE hour < NOW() - INTERVAL ' . self::KEEP_DOMAIN_DAYS . ' DAY');
-        $n += $pdo->exec('DELETE FROM stat_domain_top WHERE day < CURDATE() - INTERVAL ' . self::KEEP_DOMAIN_DAYS . ' DAY');
-        $n += $pdo->exec('DELETE FROM stat_account_daily WHERE day < CURDATE() - INTERVAL ' . self::KEEP_ACCOUNT_DAYS . ' DAY');
-        $n += $pdo->exec('DELETE FROM stat_visitors WHERE day < CURDATE()');
+        foreach ([
+            ['DELETE FROM stat_server WHERE at < ?', $days(self::KEEP_SERVER_DAYS)],
+            ['DELETE FROM stat_service_checks WHERE at < ?', $days(self::KEEP_SERVER_DAYS)],
+            ['DELETE FROM stat_domain_hourly WHERE hour < ?', $days(self::KEEP_DOMAIN_DAYS)],
+            ['DELETE FROM stat_domain_top WHERE day < ?', $days(self::KEEP_DOMAIN_DAYS)],
+            ['DELETE FROM stat_account_daily WHERE day < ?', $days(self::KEEP_ACCOUNT_DAYS)],
+            ['DELETE FROM stat_visitors WHERE day < ?', $today],
+        ] as [$sql, $before]) {
+            $st = $pdo->prepare($sql);
+            $st->execute([$before]);
+            $n += $st->rowCount();
+        }
 
         // Past days keep their biggest pages and referrers; the rest become "(other)".
-        $groups = $pdo->query('SELECT domain_id, day, kind FROM stat_domain_top WHERE day < CURDATE() AND value <> ' . $pdo->quote(AccessLogStats::OTHER)
-            . ' GROUP BY domain_id, day, kind HAVING COUNT(*) > ' . self::KEEP_TOP)->fetchAll();
+        $g = $pdo->prepare('SELECT domain_id, day, kind FROM stat_domain_top WHERE day < ? AND value <> ? GROUP BY domain_id, day, kind HAVING COUNT(*) > ' . self::KEEP_TOP);
+        $g->execute([$today, AccessLogStats::OTHER]);
+        $groups = $g->fetchAll();
         foreach ($groups as $g) {
             $rows = $pdo->prepare('SELECT value, hits FROM stat_domain_top WHERE domain_id = ? AND day = ? AND kind = ? AND value <> ? ORDER BY hits DESC, value LIMIT 100000 OFFSET ' . self::KEEP_TOP);
             $rows->execute([$g['domain_id'], $g['day'], $g['kind'], AccessLogStats::OTHER]);
@@ -204,7 +214,6 @@ final class StatsCollector
 
         // Yesterday's salt goes: its hashes can no longer be matched to anyone.
         $salt = json_decode((string) @file_get_contents(self::$saltFile), true) ?: [];
-        $today = date('Y-m-d');
         $kept = array_filter($salt, fn($k) => $k >= $today, ARRAY_FILTER_USE_KEY);
         if (count($kept) !== count($salt)) {
             self::writeSalt($kept);

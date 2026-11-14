@@ -4,33 +4,134 @@ declare(strict_types=1);
 /** WHM > Accounts. The rules (who may manage whom) live in AccountService. */
 final class AccountController
 {
+    public const PER_PAGE = 25;
+
+    /**
+     * WHM > Accounts: searched, filtered, sorted and paged in the database,
+     * so it stays quick with thousands of accounts. Every choice is in the
+     * query string (links and a GET form - works without JavaScript).
+     */
     public static function index(): void
     {
         Auth::requireRole(['admin', 'reseller']);
         $user = Auth::user();
+        $admin = $user['role'] === 'admin';
         $pdo = Database::app();
-        $select = "SELECT u.*, p.name AS package_name, r.username AS reseller_username,
-                          a.files_bytes + a.db_bytes + a.mail_bytes AS used_bytes, a.over_disk, a.over_bandwidth,
-                          (SELECT COUNT(*) FROM domains d WHERE d.user_id = u.id) AS domain_count
-                   FROM users u
-                   LEFT JOIN packages p ON p.id = u.package_id
-                   LEFT JOIN users r ON r.id = u.parent_id
-                   LEFT JOIN account_usage a ON a.user_id = u.id";
+        $f = self::filters($admin);
 
-        if ($user['role'] === 'admin') {
-            $accounts = $pdo->query("$select ORDER BY FIELD(u.role, 'admin', 'reseller', 'user'), u.username")->fetchAll();
-        } else {
-            $stmt = $pdo->prepare("$select WHERE u.role = 'user' AND u.parent_id = ? ORDER BY u.username");
-            $stmt->execute([$user['id']]);
-            $accounts = $stmt->fetchAll();
+        $hasStats = true;
+        try {
+            $pdo->query('SELECT 1 FROM stat_account_daily LIMIT 1');
+        } catch (PDOException) {
+            $hasStats = false;
         }
+        $traffic = $hasStats
+            ? '(SELECT COALESCE(SUM(s.requests), 0) FROM stat_account_daily s WHERE s.user_id = u.id AND s.day > ' . $pdo->quote(date('Y-m-d', strtotime('-14 day'))) . ')'
+            : '0';
+        $from = "FROM users u
+                 LEFT JOIN packages p ON p.id = u.package_id
+                 LEFT JOIN users r ON r.id = u.parent_id
+                 LEFT JOIN account_usage a ON a.user_id = u.id";
+        $where = [];
+        $params = [];
+        if (!$admin) {
+            $where[] = "u.role = 'user' AND u.parent_id = ?";
+            $params[] = $user['id'];
+        }
+        if ($f['q'] !== '') {
+            $like = '%' . addcslashes($f['q'], '%_\\') . '%';
+            $where[] = '(u.username LIKE ? OR u.email LIKE ? OR u.full_name LIKE ? OR EXISTS (SELECT 1 FROM domains dq WHERE dq.user_id = u.id AND dq.domain_name LIKE ?))';
+            array_push($params, $like, $like, $like, $like);
+        }
+        if ($f['role'] !== '') {
+            $where[] = 'u.role = ?';
+            $params[] = $f['role'];
+        }
+        if ($f['package'] > 0) {
+            $where[] = 'u.package_id = ?';
+            $params[] = $f['package'];
+        }
+        if ($f['reseller'] === 'none') {
+            $where[] = "u.role = 'user' AND u.parent_id IS NULL";
+        } elseif ($f['reseller'] !== '') {
+            $where[] = 'u.parent_id = ?';
+            $params[] = (int) $f['reseller'];
+        }
+        // Counts per status for the filter links, before the status filter itself.
+        $base = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+        $c = $pdo->prepare("SELECT COUNT(*) total, SUM(u.status = 'active') active, SUM(u.status = 'suspended') suspended,
+                                   SUM(COALESCE(a.over_disk, 0) = 1 OR COALESCE(a.over_bandwidth, 0) = 1) over_limits $from$base");
+        $c->execute($params);
+        $counts = array_map('intval', $c->fetch() ?: []);
+
+        if ($f['status'] === 'active' || $f['status'] === 'suspended') {
+            $where[] = 'u.status = ?';
+            $params[] = $f['status'];
+        } elseif ($f['status'] === 'over') {
+            $where[] = '(a.over_disk = 1 OR a.over_bandwidth = 1)';
+        }
+        $sql = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+        $n = $pdo->prepare("SELECT COUNT(*) $from$sql");
+        $n->execute($params);
+        $total = (int) $n->fetchColumn();
+        $pages = max(1, (int) ceil($total / self::PER_PAGE));
+        $page = min($f['page'], $pages);
+
+        $dir = $f['dir'] === 'asc' ? 'ASC' : 'DESC';
+        $order = match ($f['sort']) {
+            'name' => "u.username $dir",
+            'created' => "u.created_at $dir, u.username",
+            'disk' => "disk_pct $dir, used_bytes $dir, u.username",
+            'domains' => "domain_count $dir, u.username",
+            'traffic' => "traffic_14d $dir, u.username",
+            default => "FIELD(u.role, 'admin', 'reseller', 'user'), u.username",
+        };
+        $q = $pdo->prepare("SELECT u.*, p.name AS package_name, p.disk_quota_mb, r.username AS reseller_username,
+                                   a.files_bytes + a.db_bytes + a.mail_bytes AS used_bytes, a.over_disk, a.over_bandwidth,
+                                   CASE WHEN p.disk_quota_mb > 0 THEN (a.files_bytes + a.db_bytes + a.mail_bytes) / (p.disk_quota_mb * 1048576) ELSE NULL END AS disk_pct,
+                                   (SELECT COUNT(*) FROM domains d WHERE d.user_id = u.id) AS domain_count,
+                                   $traffic AS traffic_14d
+                            $from$sql ORDER BY $order LIMIT " . self::PER_PAGE . ' OFFSET ' . (($page - 1) * self::PER_PAGE));
+        $q->execute($params);
+        $accounts = $q->fetchAll();
+
+        $sparks = [];
+        if ($hasStats) {
+            $sparks = StatsService::accountSparklines(array_map(fn($a) => (int) $a['id'], array_filter($accounts, fn($a) => $a['role'] === 'user')));
+        }
+        $resellers = $admin ? $pdo->query("SELECT id, username FROM users WHERE role = 'reseller' ORDER BY username")->fetchAll() : [];
 
         View::render('whm/accounts', [
             'title' => 'Accounts',
             'accounts' => $accounts,
             'me' => $user,
             'packages' => AccountService::availablePackages($user),
+            'filters' => $f + ['page' => $page],
+            'counts' => $counts,
+            'total' => $total,
+            'pages' => $pages,
+            'sparks' => $sparks,
+            'resellers' => $resellers,
         ], 'whm');
+    }
+
+    /** @return array{q:string, status:string, role:string, package:int, reseller:string, sort:string, dir:string, page:int} */
+    private static function filters(bool $admin): array
+    {
+        $g = $_GET;
+        $sort = in_array($g['sort'] ?? '', ['name', 'created', 'disk', 'domains', 'traffic'], true) ? $g['sort'] : '';
+        $reseller = (string) ($g['reseller'] ?? '');
+        return [
+            'q' => mb_substr(trim((string) ($g['q'] ?? '')), 0, 100),
+            'status' => in_array($g['status'] ?? '', ['active', 'suspended', 'over'], true) ? $g['status'] : '',
+            'role' => $admin && in_array($g['role'] ?? '', ['admin', 'reseller', 'user'], true) ? $g['role'] : '',
+            'package' => max(0, (int) ($g['package'] ?? 0)),
+            'reseller' => $admin && ($reseller === 'none' || ctype_digit($reseller)) ? $reseller : '',
+            'sort' => $sort,
+            // Names read A to Z first; numbers biggest first.
+            'dir' => in_array($g['dir'] ?? '', ['asc', 'desc'], true) ? $g['dir'] : ($sort === 'name' ? 'asc' : 'desc'),
+            'page' => max(1, (int) ($g['page'] ?? 1)),
+        ];
     }
 
     public static function show(array $params): void
@@ -39,7 +140,10 @@ final class AccountController
         $me = Auth::user();
         $target = self::scopedOrBack((int) $params['id'], $me);
         $o = AccountService::overview($target);
+        [$history, $projection] = self::history($target, $o);
         View::render('whm/account', [
+            'history' => $history,
+            'projection' => $projection,
             'title' => $target['username'],
             'a' => $target,
             'me' => $me,
@@ -50,6 +154,40 @@ final class AccountController
             'overrides' => Features::overrides($target),
             'alloc' => $target['role'] === 'reseller' ? ResellerService::allocation((int) $target['id']) : null,
         ], 'whm');
+    }
+
+    /**
+     * A hosting account's last 30 days and when it reaches its disk and
+     * bandwidth limits at the current rate (null without statistics).
+     *
+     * @return array{0:?array, 1:array<string,array>}
+     */
+    private static function history(array $target, array $o): array
+    {
+        if ($target['role'] !== 'user') {
+            return [null, []];
+        }
+        try {
+            $id = (int) $target['id'];
+            $history = StatsService::accountHistory($id, 30);
+            $projection = [];
+            $u = $o['usage'];
+            if ($o['package'] && $u) {
+                $used = (int) $u['files_bytes'] + (int) $u['db_bytes'] + (int) $u['mail_bytes'];
+                $limit = Quota::bytes($o['package']['disk_quota_mb']);
+                if ($limit > 0) {
+                    $projection['disk'] = StatsService::diskProjection($id, $used, $limit);
+                }
+                $bwLimit = Quota::bytes($o['package']['bandwidth_mb']);
+                if ($bwLimit > 0) {
+                    $projection['bw'] = StatsService::bandwidthProjection($u['bw_month'] === date('Y-m') ? (int) $u['bw_bytes'] : 0, $bwLimit);
+                }
+            }
+            return [$history, $projection];
+        } catch (PDOException $e) {
+            error_log('account history: ' . $e->getMessage());
+            return [null, []];
+        }
     }
 
     public static function create(): void

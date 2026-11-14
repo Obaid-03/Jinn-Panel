@@ -361,8 +361,10 @@
     .chart { @apply relative; }
     .chart-plot { @apply absolute; }
     .chart-grid { @apply pointer-events-none absolute inset-x-0 border-t; border-color: var(--jp-chart-grid); }
+    .chart-ref { @apply pointer-events-none absolute inset-x-0 border-t border-dashed border-danger/70; }
+    .chart-ref > span { @apply absolute bottom-0.5 left-1 rounded-[4px] bg-surface/90 px-1 text-[11.5px] font-medium text-danger-text; }
     .chart-base { @apply pointer-events-none absolute inset-x-0 border-t; border-color: var(--jp-chart-axis); }
-    .chart-ytick { @apply pointer-events-none absolute -translate-y-1/2 pr-2 text-right text-[11.5px] text-subtle; font-variant-numeric: tabular-nums; }
+    .chart-ytick { @apply pointer-events-none absolute -translate-y-1/2 whitespace-nowrap pr-2 text-right text-[11.5px] text-subtle; font-variant-numeric: tabular-nums; }
     .chart-xtick { @apply pointer-events-none absolute -translate-x-1/2 whitespace-nowrap pt-2 text-[11.5px] text-subtle; font-variant-numeric: tabular-nums; }
     .chart-cross { @apply pointer-events-none absolute inset-y-0 w-px bg-fg/25; }
     .chart-tip { @apply pointer-events-none absolute z-20 min-w-[9rem] rounded-[10px] border border-line bg-surface px-3 py-2 text-[12.5px] shadow-pop; }
