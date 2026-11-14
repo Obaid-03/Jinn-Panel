@@ -1832,6 +1832,25 @@ function periodicTasks(): void
     } catch (Throwable $e) {
         writeOut('worker-periodic.log', '[' . date('c') . '] backups: ' . $e->getMessage() . "\n", true);
     }
+    try {
+        alertsDue();
+    } catch (Throwable $e) {
+        writeOut('worker-periodic.log', '[' . date('c') . '] alerts: ' . $e->getMessage() . "\n", true);
+    }
+}
+
+/**
+ * Hourly: hands the health check's result (root-only /var/lib/jinnpanel)
+ * to the panel, then emails new problems (AlertService::notify).
+ */
+function alertsDue(): void
+{
+    $health = @file_get_contents('/var/lib/jinnpanel/health.txt');
+    if ($health !== false) {
+        writeOut('health.txt', mb_substr($health, 0, 20000));
+    }
+    panelClasses();
+    AlertService::notify(fn(string $m) => writeOut('worker-alerts.log', '[' . date('c') . "] $m\n", true));
 }
 
 function appDb(): PDO

@@ -295,6 +295,41 @@ function test_s3_signature_shape(): void
     T::same($a, S3Client::authorization('PUT', 'bucket.s3.amazonaws.com', '/k', '', '20261001T000000Z', 'eu-central-1', 'AKID', 'SECRET'), 'deterministic');
 }
 
+function test_ssh_public_keys(): void
+{
+    $blob = fn(string $type) => base64_encode(pack('N', strlen($type)) . $type . pack('N', 32) . str_repeat("\x01", 32));
+    T::ok(FtpController::validKey('ssh-ed25519 ' . $blob('ssh-ed25519') . ' me@laptop'), 'ed25519 with comment');
+    T::ok(FtpController::validKey('ssh-ed25519 ' . $blob('ssh-ed25519')), 'ed25519 without comment');
+    T::ok(!FtpController::validKey('ssh-rsa ' . $blob('ssh-ed25519')), 'type in the blob must match');
+    T::ok(!FtpController::validKey('ssh-ed25519 AAAA'), 'too short');
+    T::ok(!FtpController::validKey('-----BEGIN OPENSSH PRIVATE KEY-----'), 'private key refused');
+    T::ok(!FtpController::validKey("ssh-ed25519 " . $blob('ssh-ed25519') . " x\nssh-rsa y"), 'no second line smuggled in');
+}
+
+function test_recovery_code_shape(): void
+{
+    T::ok(RecoveryCodes::looksLikeOne('k7mq-2xpd-9fhw'), 'dashed');
+    T::ok(RecoveryCodes::looksLikeOne(' K7MQ 2XPD 9FHW '), 'spaces and case');
+    T::ok(!RecoveryCodes::looksLikeOne('123456'), 'a TOTP code is not one');
+}
+
+function test_ui_components_escape(): void
+{
+    require_once APP . '/src/View.php';
+    $_SESSION = ['csrf' => str_repeat('a', 64)];
+    $html = Ui::field('name', 'Name <b>', ['value' => '"><script>x</script>', 'hint' => 'h&i', 'required' => true]);
+    T::ok(!str_contains($html, '<script>') && !str_contains($html, '<b>'), 'label, value escaped', $html);
+    T::ok((bool) preg_match('/<label for="(f-\d+)"[^>]*>.*<input[^>]* id="\1"/s', $html), 'label tied to the input', $html);
+    T::ok(str_contains($html, 'aria-describedby="') && str_contains($html, 'required'), 'hint described, required');
+    T::same(' a="1" b', Ui::attrs(['a' => 1, 'b' => true, 'c' => false, 'd' => null]), 'attrs: true bare, false/null dropped');
+    $_SESSION['old'] = ['email' => 'kept@example.com', 'password' => 'secret'];
+    T::ok(str_contains(Ui::field('email', 'Email'), 'value="kept@example.com"'), 'old value refilled');
+    T::ok(!str_contains(Ui::field('password', 'Password', ['type' => 'password']), 'secret'), 'never a password');
+    $form = Ui::deleteForm('/x/1/delete', 'Really "delete"?');
+    T::ok(str_contains($form, 'data-confirm="Really &quot;delete&quot;?"') && str_contains($form, 'aria-label="Delete"') && str_contains($form, 'name="csrf_token"'), 'delete form: confirm, name, CSRF', $form);
+    T::same('badge badge-danger', preg_replace('/^<span class="([^"]+)".*$/s', '$1', Ui::status('failed')), 'status tone');
+}
+
 // ---------------------------------------------------------------------------
 
 $filter = $argv[1] ?? '';

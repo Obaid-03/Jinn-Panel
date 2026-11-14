@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+/** WHM > Accounts. The rules (who may manage whom) live in AccountService. */
 final class AccountController
 {
     public static function index(): void
@@ -8,23 +9,18 @@ final class AccountController
         Auth::requireRole(['admin', 'reseller']);
         $user = Auth::user();
         $pdo = Database::app();
+        $select = "SELECT u.*, p.name AS package_name, r.username AS reseller_username,
+                          a.files_bytes + a.db_bytes + a.mail_bytes AS used_bytes, a.over_disk, a.over_bandwidth,
+                          (SELECT COUNT(*) FROM domains d WHERE d.user_id = u.id) AS domain_count
+                   FROM users u
+                   LEFT JOIN packages p ON p.id = u.package_id
+                   LEFT JOIN users r ON r.id = u.parent_id
+                   LEFT JOIN account_usage a ON a.user_id = u.id";
 
         if ($user['role'] === 'admin') {
-            $accounts = $pdo->query(
-                "SELECT u.*, p.name AS package_name, r.username AS reseller_username
-                 FROM users u
-                 LEFT JOIN packages p ON p.id = u.package_id
-                 LEFT JOIN users r ON r.id = u.parent_id
-                 WHERE u.role IN ('reseller','user')
-                 ORDER BY u.role, u.created_at DESC"
-            )->fetchAll();
+            $accounts = $pdo->query("$select ORDER BY FIELD(u.role, 'admin', 'reseller', 'user'), u.username")->fetchAll();
         } else {
-            $stmt = $pdo->prepare(
-                "SELECT u.*, p.name AS package_name, NULL AS reseller_username
-                 FROM users u LEFT JOIN packages p ON p.id = u.package_id
-                 WHERE u.role = 'user' AND u.parent_id = ?
-                 ORDER BY u.created_at DESC"
-            );
+            $stmt = $pdo->prepare("$select WHERE u.role = 'user' AND u.parent_id = ? ORDER BY u.username");
             $stmt->execute([$user['id']]);
             $accounts = $stmt->fetchAll();
         }
@@ -32,14 +28,30 @@ final class AccountController
         View::render('whm/accounts', ['title' => 'Accounts', 'accounts' => $accounts, 'me' => $user], 'whm');
     }
 
+    public static function show(array $params): void
+    {
+        Auth::requireRole(['admin', 'reseller']);
+        $me = Auth::user();
+        $target = self::scopedOrBack((int) $params['id'], $me);
+        View::render('whm/account', [
+            'title' => $target['username'],
+            'a' => $target,
+            'me' => $me,
+            'o' => AccountService::overview($target),
+            'lastAdmin' => AccountService::isLastAdmin($target),
+        ], 'whm');
+    }
+
     public static function create(): void
     {
         Auth::requireRole(['admin', 'reseller']);
-        $packages = self::availablePackages(Auth::user());
+        $me = Auth::user();
         View::render('whm/account_form', [
             'title' => 'Create Account',
-            'packages' => $packages,
-            'canCreateReseller' => Auth::isAdmin(),
+            'account' => null,
+            'packages' => AccountService::availablePackages($me),
+            'roles' => AccountService::creatableRoles($me),
+            'welcome' => NotificationService::settings()['welcome'],
         ], 'whm');
     }
 
@@ -49,92 +61,57 @@ final class AccountController
         Csrf::requireValid();
         $me = Auth::user();
 
-        $username = strtolower(trim((string) ($_POST['username'] ?? '')));
-        $email = trim((string) ($_POST['email'] ?? ''));
-        $fullName = trim((string) ($_POST['full_name'] ?? ''));
-        $password = (string) ($_POST['password'] ?? '');
-        $role = $me['role'] === 'admin' ? (string) ($_POST['role'] ?? 'user') : 'user';
-        $packageId = (int) ($_POST['package_id'] ?? 0) ?: null;
+        $result = AccountService::create($_POST, $me);
+        if ($result['errors']) {
+            Flash::error(implode(' ', $result['errors']));
+            header('Location: /whm/accounts/create');
+            exit;
+        }
+        $id = (int) $result['id'];
+        Audit::target($id);
+        $s = Database::app()->prepare('SELECT * FROM users WHERE id = ?');
+        $s->execute([$id]);
+        $row = $s->fetch();
+        $note = '';
+        if (!empty($_POST['send_welcome'])) {
+            $note = NotificationService::welcome($row)
+                ? " A welcome email went to {$row['email']}."
+                : ' The welcome email could not be sent - check WHM > Notifications.';
+        }
+        Flash::ok("Account \"{$row['username']}\" created as {$row['role']}.$note");
+        header("Location: /whm/accounts/$id");
+        exit;
+    }
 
-        if (!in_array($role, ['reseller', 'user'], true)) {
-            $role = 'user';
-        }
+    public static function edit(array $params): void
+    {
+        Auth::requireRole(['admin', 'reseller']);
+        $me = Auth::user();
+        $target = self::scopedOrBack((int) $params['id'], $me);
+        View::render('whm/account_form', [
+            'title' => 'Edit ' . $target['username'],
+            'account' => $target,
+            'packages' => AccountService::availablePackages($me),
+            'roles' => [$target['role']],
+            'welcome' => false,
+        ], 'whm');
+    }
 
-        $errors = [];
-        if (($problem = $role === 'user' ? Usernames::problem($username) : Usernames::loginProblem($username)) !== null) {
-            $errors[] = $problem;
-        }
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errors[] = 'A valid email address is required.';
-        }
-        if (($problem = Passwords::problem($password, $username)) !== null) {
-            $errors[] = $problem;
-        }
-
-        $pdo = Database::app();
-        if (!$errors) {
-            $chk = $pdo->prepare('SELECT id FROM users WHERE username = ? OR email = ?');
-            $chk->execute([$username, $email]);
-            if ($chk->fetch()) {
-                $errors[] = 'That username or email is already taken.';
-            }
-        }
-
-        // A reseller may create as many accounts as its own package allows.
-        if (!$errors && $me['role'] === 'reseller') {
-            $pkg = Quota::package((int) $me['id']);
-            $limit = (int) ($pkg['max_accounts'] ?? 0);
-            $n = $pdo->prepare("SELECT COUNT(*) FROM users WHERE parent_id = ? AND role = 'user'");
-            $n->execute([$me['id']]);
-            if ((int) $n->fetchColumn() >= $limit) {
-                $errors[] = $limit > 0 ? "Your reseller package allows $limit accounts - you've reached that." : 'Your reseller package doesn\'t allow creating accounts - ask the server administrator.';
-            }
-        }
-
-        // Limits come only from the package (Quota, UsageService): a hosting
-        // account without one could create nothing and would have no quota.
-        if (!$errors && $role === 'user' && !$packageId) {
-            $errors[] = 'Choose a hosting package for the account.';
-        }
-
-        if (!$errors && $packageId) {
-            $allowedIds = array_column(self::availablePackages($me), 'id');
-            if (!in_array($packageId, $allowedIds, true)) {
-                $errors[] = 'Invalid package selected.';
-            }
-        }
-
+    public static function update(array $params): void
+    {
+        Auth::requireRole(['admin', 'reseller']);
+        Csrf::requireValid();
+        $me = Auth::user();
+        $target = self::scopedOrBack((int) $params['id'], $me);
+        Audit::target((int) $target['id']);
+        $errors = AccountService::update($target, $_POST, $me);
         if ($errors) {
-            View::render('whm/account_form', [
-                'title' => 'Create Account',
-                'packages' => self::availablePackages($me),
-                'canCreateReseller' => Auth::isAdmin(),
-                'errors' => $errors,
-            ], 'whm');
-            return;
+            Flash::error(implode(' ', $errors));
+            header("Location: /whm/accounts/{$target['id']}/edit");
+            exit;
         }
-
-        $stmt = $pdo->prepare(
-            'INSERT INTO users (username, email, password_hash, full_name, role, parent_id, package_id, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, \'active\')'
-        );
-        $stmt->execute([
-            $username,
-            $email,
-            password_hash($password, PASSWORD_BCRYPT),
-            $fullName ?: null,
-            $role,
-            $role === 'user' ? ($me['role'] === 'admin' ? null : $me['id']) : null,
-            $packageId,
-        ]);
-
-        $newId = (int) $pdo->lastInsertId();
-        Audit::target($newId);
-        if ($role === 'user') {
-            AccountRuntime::sync($newId); // its Linux user, PHP home and (once it has domains) pools
-        }
-        Flash::ok("Account \"$username\" created as $role.");
-        header('Location: /whm/accounts');
+        Flash::ok("Account \"{$target['username']}\" saved." . ((string) ($_POST['password'] ?? '') !== '' ? ' Its new password is in effect and its other sessions were signed out.' : ''));
+        header("Location: /whm/accounts/{$target['id']}");
         exit;
     }
 
@@ -152,22 +129,17 @@ final class AccountController
     {
         Auth::requireRole(['admin', 'reseller']);
         Csrf::requireValid();
-        $me = Auth::user();
-        $target = self::findScopedAccount((int) $params['id'], $me);
-        if (!$target) {
-            Flash::error('Account not found.');
-            header('Location: /whm/accounts');
-            exit;
-        }
-
+        $target = self::scopedOrBack((int) $params['id'], Auth::user());
+        Audit::target((int) $target['id']);
         // Best-effort external cleanup (vhosts, DNS, databases + every MySQL
         // user the account owns, mailboxes, SFTP users), then the cascading
-        // DB delete. Shared with the cPanel migration rollback. The worker
-        // then removes its pools and Linux user, and moves its site folders
-        // aside (root-only) - a later account must never inherit them.
-        AccountCleanupService::purge((int) $target['id']);
-        Audit::target((int) $target['id']);
-
+        // DB delete. The worker then removes its pools and Linux user and
+        // moves its site folders aside (root-only).
+        if (($problem = AccountService::delete($target)) !== null) {
+            Flash::error($problem);
+            header("Location: /whm/accounts/{$target['id']}");
+            exit;
+        }
         Flash::ok("Account \"{$target['username']}\" and its resources have been removed.");
         header('Location: /whm/accounts');
         exit;
@@ -178,18 +150,42 @@ final class AccountController
     {
         Auth::requireRole(['admin']);
         Csrf::requireValid();
-        $target = self::findScopedAccount((int) $params['id'], Auth::user());
-        if (!$target || $target['role'] !== 'user') {
-            Flash::error('Account not found.');
-            header('Location: /whm/accounts');
-            exit;
+        $target = self::scopedOrBack((int) $params['id'], Auth::user());
+        if ($target['role'] !== 'user') {
+            self::back('Only hosting accounts run PHP.', true);
         }
         $on = !empty($_POST['allow']);
         Database::app()->prepare('UPDATE users SET php_exec = ? WHERE id = ?')->execute([$on ? 1 : 0, $target['id']]);
         AccountRuntime::sync((int) $target['id']);
         Audit::target((int) $target['id']);
         Flash::ok("\"{$target['username']}\": PHP " . ($on ? 'may now run programs (exec, proc_open, ...).' : 'may no longer run programs.'));
-        header('Location: /whm/accounts');
+        header("Location: /whm/accounts/{$target['id']}");
+        exit;
+    }
+
+    /** "Log in as": open a hosting account's own panel, then come back with the banner's button. */
+    public static function loginAs(array $params): void
+    {
+        Auth::requireRole(['admin', 'reseller']);
+        Csrf::requireValid();
+        $me = Auth::user();
+        $target = self::scopedOrBack((int) $params['id'], $me);
+        if ($target['role'] !== 'user' || $target['status'] !== 'active') {
+            Flash::error('Only active hosting accounts can be opened.');
+            header("Location: /whm/accounts/{$target['id']}");
+            exit;
+        }
+        AccountService::impersonate($target, $me);
+        header('Location: /cpanel');
+        exit;
+    }
+
+    /** POST /impersonate/stop - back to the admin/reseller session. */
+    public static function stopImpersonating(): void
+    {
+        Csrf::requireValid();
+        $id = AccountService::stopImpersonating();
+        header('Location: ' . ($id !== null ? "/whm/accounts/$id" : '/login'));
         exit;
     }
 
@@ -197,22 +193,12 @@ final class AccountController
     {
         Auth::requireRole(['admin', 'reseller']);
         Csrf::requireValid();
-        $me = Auth::user();
-        $target = self::findScopedAccount((int) $params['id'], $me);
-        if (!$target) {
-            Flash::error('Account not found.');
-            header('Location: /whm/accounts');
-            exit;
-        }
-
-        $stmt = Database::app()->prepare('UPDATE users SET status = ? WHERE id = ?');
-        $stmt->execute([$status, $target['id']]);
+        $target = self::scopedOrBack((int) $params['id'], Auth::user());
         Audit::target((int) $target['id']);
-        $problems = $target['role'] === 'user' ? SuspensionService::apply((int) $target['id'], $status === 'suspended') : [];
-        if ($target['role'] !== 'user') {
-            Auth::invalidateSessions((int) $target['id']);
+        $problems = AccountService::setStatus($target, $status);
+        if ($target['role'] !== 'user' && $problems) {
+            self::back(ucfirst($problems[0]) . '.', true, (int) $target['id']);
         }
-
         $what = $status === 'suspended'
             ? ' Its sites, mail logins, SFTP, MySQL users and cron jobs are switched off.'
             : ' Its sites, mail logins, SFTP, MySQL users and cron jobs are back on.';
@@ -220,37 +206,24 @@ final class AccountController
         if ($problems) {
             Flash::error('Not everything could be switched: ' . implode('; ', array_slice($problems, 0, 5)));
         }
-        header('Location: /whm/accounts');
+        header('Location: ' . (($_POST['back'] ?? '') === 'list' ? '/whm/accounts' : "/whm/accounts/{$target['id']}"));
         exit;
     }
 
-    private static function findScopedAccount(int $id, array $me): ?array
+    /** @return array<string,mixed> */
+    private static function scopedOrBack(int $id, array $me): array
     {
-        $pdo = Database::app();
-        $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
-        $stmt->execute([$id]);
-        $row = $stmt->fetch();
-        if (!$row) {
-            return null;
+        $target = AccountService::findScoped($id, $me);
+        if (!$target) {
+            self::back('Account not found.', true);
         }
-        if ($row['id'] === $me['id']) {
-            return null; // cannot act on yourself here
-        }
-        if ($me['role'] === 'admin') {
-            return $row['role'] === 'admin' ? null : $row;
-        }
-        // reseller: only their own directly-created users
-        return ($row['role'] === 'user' && (int) $row['parent_id'] === $me['id']) ? $row : null;
+        return $target;
     }
 
-    private static function availablePackages(array $me): array
+    private static function back(string $message, bool $error = false, ?int $id = null): never
     {
-        $pdo = Database::app();
-        if ($me['role'] === 'admin') {
-            return $pdo->query('SELECT * FROM packages ORDER BY owner_id IS NOT NULL, id')->fetchAll();
-        }
-        $stmt = $pdo->prepare('SELECT * FROM packages WHERE owner_id IS NULL OR owner_id = ? ORDER BY owner_id IS NOT NULL, id');
-        $stmt->execute([$me['id']]);
-        return $stmt->fetchAll();
+        $error ? Flash::error($message) : Flash::ok($message);
+        header('Location: ' . ($id ? "/whm/accounts/$id" : '/whm/accounts'));
+        exit;
     }
 }

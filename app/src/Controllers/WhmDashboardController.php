@@ -24,16 +24,39 @@ final class WhmDashboardController
             $domainCount = (int) $stmt->fetch()['c'];
         }
 
+        $admin = $user['role'] === 'admin';
+        $recent = $pdo->prepare(
+            'SELECT a.created_at, a.action, a.detail, actor.username AS actor_name, target.username AS target_name
+             FROM activity_log a LEFT JOIN users actor ON actor.id = a.actor_id LEFT JOIN users target ON target.id = a.target_user_id'
+            . ($admin ? '' : ' WHERE a.actor_id = ? OR target.parent_id = ?')
+            . ' ORDER BY a.id DESC LIMIT 8'
+        );
+        $recent->execute($admin ? [] : [$user['id'], $user['id']]);
+
         View::render('whm/dashboard', [
             'title' => 'Dashboard',
+            'me' => $user,
             'resellerCount' => $resellerCount,
             'userCount' => $userCount,
             'domainCount' => $domainCount,
-            'stats' => $user['role'] === 'admin' ? self::serverStats() : null,
-            'logServices' => $user['role'] === 'admin' ? self::logServices() : [],
-            'selectedLog' => $_GET['log'] ?? 'frankenphp',
-            'logContent' => $user['role'] === 'admin' ? self::readLog((string) ($_GET['log'] ?? 'frankenphp')) : null,
+            'suspendedCount' => self::suspendedCount($user),
+            'stats' => $admin ? ServerStatus::stats() : null,
+            'alerts' => $admin ? AlertService::collect() : [],
+            'recent' => $recent->fetchAll(),
+            'logServices' => $admin ? self::logServices() : [],
+            'selectedLog' => (string) ($_GET['log'] ?? 'frankenphp'),
+            'logContent' => $admin ? self::readLog((string) ($_GET['log'] ?? 'frankenphp')) : null,
         ], 'whm');
+    }
+
+    private static function suspendedCount(array $user): int
+    {
+        if ($user['role'] === 'admin') {
+            return (int) Database::app()->query("SELECT COUNT(*) FROM users WHERE role = 'user' AND status = 'suspended'")->fetchColumn();
+        }
+        $s = Database::app()->prepare("SELECT COUNT(*) FROM users WHERE role = 'user' AND status = 'suspended' AND parent_id = ?");
+        $s->execute([$user['id']]);
+        return (int) $s->fetchColumn();
     }
 
     public static function pullLog(): void
@@ -67,60 +90,5 @@ final class WhmDashboardController
             return "No log data yet for \"$service\" - the background worker refreshes this every 5 seconds; it may not have run yet.";
         }
         return $log ?: '(empty)';
-    }
-
-    private static function serverStats(): array
-    {
-        $diskTotal = @disk_total_space('/') ?: 0;
-        $diskFree = @disk_free_space('/') ?: 0;
-        $diskUsed = $diskTotal - $diskFree;
-
-        $memTotal = 0;
-        $memAvailable = 0;
-        $meminfo = @file('/proc/meminfo');
-        if ($meminfo) {
-            foreach ($meminfo as $line) {
-                if (str_starts_with($line, 'MemTotal:')) {
-                    $memTotal = (int) filter_var($line, FILTER_SANITIZE_NUMBER_INT) * 1024;
-                }
-                if (str_starts_with($line, 'MemAvailable:')) {
-                    $memAvailable = (int) filter_var($line, FILTER_SANITIZE_NUMBER_INT) * 1024;
-                }
-            }
-        }
-
-        // Checked by whether each service's port actually accepts connections,
-        // not via `systemctl is-active`: FrankenPHP's SELinux domain (httpd_t)
-        // is deliberately not allowed to query systemd over D-Bus ("Access
-        // denied" from systemd itself, not a misconfiguration to work around).
-        // A port check is arguably the more meaningful signal anyway - it's
-        // "can this thing actually serve a request", not just "does its unit
-        // exist" - and needs no special privileges since it's a plain TCP
-        // connect the app already has via httpd_can_network_connect.
-        $services = [
-            'mariadb' => 3306,
-            'frankenphp' => 443,
-            'stalwart' => 8080,
-            'sftpgo' => 8090,
-            'knot' => 53,
-        ];
-        $serviceStatus = [];
-        foreach ($services as $svc => $port) {
-            $conn = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.5);
-            if ($conn) {
-                fclose($conn);
-                $serviceStatus[$svc] = 'active';
-            } else {
-                $serviceStatus[$svc] = 'inactive';
-            }
-        }
-
-        return [
-            'disk_total' => $diskTotal,
-            'disk_used' => $diskUsed,
-            'mem_total' => $memTotal,
-            'mem_used' => $memTotal - $memAvailable,
-            'services' => $serviceStatus,
-        ];
     }
 }
