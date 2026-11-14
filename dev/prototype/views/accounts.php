@@ -1,5 +1,5 @@
 <?php
-$rows = proto_accounts();
+$rows = stats_accounts();
 $sort = in_array($_GET['sort'] ?? '', ['name', 'disk', 'traffic', 'created'], true) ? $_GET['sort'] : 'traffic';
 usort($rows, fn($a, $b) => match ($sort) {
     'name' => strcmp($a['username'], $b['username']),

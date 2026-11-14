@@ -27,7 +27,7 @@ if (str_starts_with($uri, '/__proto/assets/')) {
 
 require_once __DIR__ . '/../preview/bootstrap.php';
 require_once __DIR__ . '/Chart.php';
-require_once __DIR__ . '/sample.php';
+require_once __DIR__ . '/../preview/fixtures/_sample_stats.php';
 View::reset();
 
 $screens = [

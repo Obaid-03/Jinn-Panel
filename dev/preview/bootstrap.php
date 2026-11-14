@@ -204,7 +204,8 @@ function preview_render(string $view, array $fx, ?string $variant = null, ?strin
     View::reset();
     ob_start();
     try {
-        View::render($view, $data, array_key_exists('layout', $fx) ? $fx['layout'] : 'whm');
+        // A fixture may point at a file outside app/views (the chart gallery).
+        View::render($fx['view'] ?? $view, $data, array_key_exists('layout', $fx) ? $fx['layout'] : 'whm');
     } catch (Throwable $e) {
         ob_end_clean();
         throw $e;

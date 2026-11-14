@@ -365,6 +365,51 @@ function test_quota_notice_levels(): void
     T::same(100, UsageNoticeService::level(50, 100, true), 'flagged over by the usage run');
 }
 
+function test_chart_scale_and_formats(): void
+{
+    require_once APP . '/src/View.php';
+    T::same([4.0, [0.0, 1.0, 2.0, 3.0, 4.0]], Chart::scale(0), 'nothing yet: 0..4');
+    T::same([20000.0, [0.0, 5000.0, 10000.0, 15000.0, 20000.0]], Chart::scale(17436), 'rounds up to 1/2/2.5/5 steps');
+    T::same([0.8, [0.0, 0.2, 0.4, 0.6, 0.8]], Chart::scale(0.62), 'fractions (load)');
+    T::same(100.0, Chart::scale(100)[0], 'an exact step stays');
+    T::same(2000.0, Chart::scale(1600)[0], '1600 -> 2000 (step 500)');
+    T::same('1,284', Chart::compact(1284), 'compact under 10K keeps digits');
+    T::same('12.9K', Chart::compact(12900), 'compact K');
+    T::same('3.4M', Chart::compact(3400000), 'compact M');
+    T::same('20K', Chart::compact(20000), 'no trailing .0');
+    T::same('0.25', Chart::compact(0.25), 'small fractions');
+    T::same('0 B', Chart::bytes(0), 'bytes zero');
+    T::same('1.5 GB', Chart::bytes(1610612736), 'bytes GB');
+    T::same('512 KB', Chart::bytes(524288), 'bytes KB');
+    T::same('43%', Chart::format(42.6, 'pct'), 'pct');
+    T::same('180 ms', Chart::format(180, 'ms'), 'ms');
+    T::same('1.2 s', Chart::format(1240, 'ms'), 'ms over a second');
+    T::same('0.62', Chart::format(0.62, 'load'), 'load');
+    T::same('1,234,567', Chart::format(1234567, 'count'), 'count');
+}
+
+function test_chart_markup(): void
+{
+    require_once APP . '/src/View.php';
+    View::reset();
+    $html = Chart::columns(
+        [['name' => 'a<b>'], ['name' => 'b'], ['name' => 'c'], ['name' => 'd'], ['name' => 'e']],
+        [[1, 2, 3, 4, 5], [5, 4, 3, 2, 1]],
+        ['Mon', 'Tue'],
+        'Requests "per" day'
+    );
+    T::ok(!str_contains($html, '<b>') && str_contains($html, 'a&lt;b&gt;'), 'series names escaped');
+    T::ok(str_contains($html, 'aria-label="Requests &quot;per&quot; day.'), 'label escaped, role img');
+    T::ok(str_contains($html, '&quot;name&quot;:&quot;e&quot;,&quot;series&quot;:&quot;so&quot;') && str_contains($html, '<span class="so"'), 'a fifth series folds into Other');
+    T::ok(str_contains($html, 'Show as table') && substr_count($html, '<tr>') === 3, 'table view: header + 2 rows');
+    T::same(['charts'], View::scripts(), 'charts.js is loaded once');
+    Chart::line([['name' => 'x', 'values' => [1, 2]]], ['a', 'b'], 'x');
+    T::same(['charts'], View::scripts(), 'and only once');
+    T::ok(str_contains(Chart::line([], [], 'none'), 'No data yet'), 'empty data: a note, not a broken chart');
+    T::ok(str_contains(Chart::sparkline([3], 'one'), 'No data yet'), 'one point is not a line');
+    T::ok(!str_contains(Chart::columns([['name' => 'a']], [[1], [2]], ['x', 'y'], 'one series'), 'Total'), 'one series: no total');
+}
+
 // ---------------------------------------------------------------------------
 
 $filter = $argv[1] ?? '';

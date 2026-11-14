@@ -1,18 +1,18 @@
 <?php
 declare(strict_types=1);
 
-/** Deterministic sample data for the prototype screens (same numbers on every load). */
+/** Deterministic sample statistics for the preview (charts, dashboards) (same numbers on every load). */
 
-function proto_rand(int $seed): callable
+function stats_rand(int $seed): callable
 {
     mt_srand($seed);
     return fn(float $lo = 0, float $hi = 1): float => $lo + mt_rand() / mt_getrandmax() * ($hi - $lo);
 }
 
 /** Traffic per bucket for the busiest sites, with a spike on one of them. @return array{labels:list<string>, series:list<array>, stacks:list<list<float>>, spike:int} */
-function proto_traffic(string $range): array
+function stats_traffic(string $range): array
 {
-    $r = proto_rand(42);
+    $r = stats_rand(42);
     [$n, $step, $fmt] = match ($range) {
         '7d' => [42, 4 * 3600, 'D H:00'],
         '30d' => [30, 86400, 'j M'],
@@ -49,9 +49,9 @@ function proto_traffic(string $range): array
 }
 
 /** A smooth daily-ish series for sparklines and small charts. @return list<float> */
-function proto_series(int $seed, int $n, float $base, float $wiggle = 0.25, float $trend = 0.0): array
+function stats_series(int $seed, int $n, float $base, float $wiggle = 0.25, float $trend = 0.0): array
 {
-    $r = proto_rand($seed);
+    $r = stats_rand($seed);
     $out = [];
     $v = $base;
     for ($i = 0; $i < $n; $i++) {
@@ -62,7 +62,7 @@ function proto_series(int $seed, int $n, float $base, float $wiggle = 0.25, floa
 }
 
 /** @return list<array<string,mixed>> */
-function proto_accounts(): array
+function stats_accounts(): array
 {
     $names = [
         ['acme', 'Acme Ltd', 'owner@acme.test', 'Business', 'resell'], ['bakery', 'The Bakery', 'hello@bakery.test', 'Starter', null],
@@ -74,13 +74,13 @@ function proto_accounts(): array
     ];
     $out = [];
     foreach ($names as $i => [$u, $full, $email, $pkg, $res]) {
-        $r = proto_rand(100 + $i);
+        $r = stats_rand(100 + $i);
         $limit = match ($pkg) { 'Starter' => 1024, 'Unlimited' => -1, default => 5120 };
         $used = $u === 'bakery' ? $limit * 1.08 : ($limit > 0 ? $limit * $r(0.12, 0.94) : $r(2000, 9000));
         $out[] = [
             'id' => 10 + $i, 'username' => $u, 'full_name' => $full, 'email' => $email, 'package' => $pkg, 'reseller' => $res,
             'disk_used_mb' => round($used), 'disk_limit_mb' => $limit, 'domains' => (int) round($r(1, 5)),
-            'traffic' => proto_series(200 + $i, 14, $r(200, 4000), 0.35, $u === 'acme' ? 0.8 : 0),
+            'traffic' => stats_series(200 + $i, 14, $r(200, 4000), 0.35, $u === 'acme' ? 0.8 : 0),
             'status' => $u === 'harbour' ? 'suspended' : 'active',
             'created' => date('Y-m-d', strtotime('2026-11-14') - (int) $r(5, 400) * 86400),
         ];

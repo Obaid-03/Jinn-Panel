@@ -1,6 +1,6 @@
 <?php
 $range = in_array($_GET['range'] ?? '', ['24h', '7d', '30d'], true) ? $_GET['range'] : '24h';
-$t = proto_traffic($range);
+$t = stats_traffic($range);
 $totals = array_map('array_sum', $t['stacks']);
 $total = array_sum($totals);
 $prevTotal = $total / 1.12;
@@ -23,9 +23,9 @@ foreach (['24h' => '24 hours', '7d' => '7 days', '30d' => '30 days'] as $k => $l
 }
 $actions .= '</nav><a href="/__proto/accounts" class="btn btn-primary">' . icon('user-plus') . 'Create account</a>';
 
-$cpu = proto_series(7, 48, 0.6, 0.5);
-$mem = proto_series(8, 48, 4.6, 0.08);
-$bw = proto_series(9, 14, 120, 0.3, 0.4);
+$cpu = stats_series(7, 48, 0.6, 0.5);
+$mem = stats_series(8, 48, 4.6, 0.08);
+$bw = stats_series(9, 14, 120, 0.3, 0.4);
 $services = [
     ['Web server', 'frankenphp', array_fill(0, 48, 'up'), '100%'],
     ['Mail', 'stalwart', array_merge(array_fill(0, 30, 'up'), ['slow', 'slow'], array_fill(0, 16, 'up')), '100%'],

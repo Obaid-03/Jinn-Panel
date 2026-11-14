@@ -3,12 +3,12 @@ $days = [];
 for ($i = 29; $i >= 0; $i--) {
     $days[] = date('j M', strtotime('2026-11-14') - $i * 86400);
 }
-$visitors = proto_series(31, 30, 560, 0.28, 0.35);
+$visitors = stats_series(31, 30, 560, 0.28, 0.35);
 $total = array_sum($visitors);
 $sites = [
-    ['acme.test', 1, 'ok', 'Let\'s Encrypt', proto_series(41, 14, 420, 0.3, 0.3), '12.4K', '248K'],
-    ['shop.acme.test', 2, 'ok', 'Let\'s Encrypt', proto_series(42, 14, 160, 0.45, 0.9), '5.1K', '142K'],
-    ['acme-staging.example', 3, 'warn', 'DNS not pointing here', proto_series(43, 14, 8, 0.6), '214', '3.9K'],
+    ['acme.test', 1, 'ok', 'Let\'s Encrypt', stats_series(41, 14, 420, 0.3, 0.3), '12.4K', '248K'],
+    ['shop.acme.test', 2, 'ok', 'Let\'s Encrypt', stats_series(42, 14, 160, 0.45, 0.9), '5.1K', '142K'],
+    ['acme-staging.example', 3, 'warn', 'DNS not pointing here', stats_series(43, 14, 8, 0.6), '214', '3.9K'],
 ];
 $actions = '<nav class="segmented" aria-label="Time range"><a href="#">7 days</a><a href="#" aria-current="true">30 days</a><a href="#">90 days</a></nav>'
     . '<a href="#" class="btn btn-primary">' . icon('plus') . 'Add domain</a>';

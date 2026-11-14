@@ -9,6 +9,7 @@ there is no build step beyond the Tailwind CLI and no front-end framework.
 - [Design tokens](#design-tokens)
 - [Component classes](#component-classes)
 - [PHP helpers (`Ui::`)](#php-helpers-ui)
+- [Charts (`Chart::`)](#charts-chart)
 - [Page structure](#page-structure)
 - [Behaviour (`app.js`)](#behaviour-appjs)
 - [Rules](#rules)
@@ -40,6 +41,7 @@ open http://127.0.0.1:8787/__preview       # index of every page and state
 ```
 
 Pages open at their real URLs (`/cpanel/domains`, `/whm/accounts`, ...).
+`/__charts` shows every chart type with sample data.
 `?as=admin|reseller|user` switches role, `?variant=<name>` shows another
 state (empty lists, errors). Forms don't change anything: a POST shows what
 would have been sent.
@@ -145,6 +147,33 @@ icons go in `View.php`, `assets/icons/` and `docs/ICONS.md`.
 
 `t($text, $vars)` wraps interface text. It returns the English text today;
 it is where translations will be looked up, so new text should use it.
+
+## Charts (`Chart::`)
+
+`app/src/Support/Chart.php` draws charts on the server as HTML and SVG:
+no chart library, nothing to download, and a chart reads without
+JavaScript. Drawing one loads `pages/charts.js` for the crosshair, the
+tooltip and arrow-key reading. Every chart has a "Show as table" view.
+
+| Helper | |
+|---|---|
+| `Chart::line($series, $labels, $label, [...])` | lines over time; one series can be an `area`. `fmt`, `max` (fixed top, e.g. 100 for percent), `height`, `xEvery`, `table` (first column heading, or `false`) |
+| `Chart::columns($series, $stacks, $labels, $label, [...])` | stacked columns per time bucket, with a total in the tooltip; `annotate => [index, text]` marks one column |
+| `Chart::sparkline($values, $label, [...])` | a small trend for a table row or a stat; `series`, `area`, `height` |
+| `Chart::ring($pct, $label, [...])` | one share of a limit; `tone` accent / warning / danger |
+| `Chart::uptime($checks, $label)` | one cell per check: `up`, `slow`, `down` or `null`; print the uptime figure beside it |
+| `Chart::ranked($rows, $label)` | top pages, referrers, accounts: `[name, value, shown]`, largest first |
+| `Chart::legend($series, $lines)`, `Chart::table(...)` | legend for two or more series; the table view on its own |
+| `Chart::ranges([...], $current, $label)` | 24 hours / 7 days / 30 days links; inside `data-chart-region="name"` only that region reloads |
+| `Chart::format($v, 'count'\|'compact'\|'bytes'\|'pct'\|'load'\|'ms')`, `compact`, `bytes`, `scale` | the number formats the axes and tooltips use |
+
+`$label` is what a screen reader hears for the chart: say what it shows
+("Requests per hour by site"). Series are `['name' => ..., 'values' =>
+[...], 'series' => 's1']`; without `series` they take s1 to s4 in order and
+a fifth folds into Other. Keep a site's or service's class the same on
+every chart and range. Two measures with different units are two charts,
+never one chart with two axes. With no data, a chart says so instead of
+drawing an empty frame.
 
 ## Page structure
 

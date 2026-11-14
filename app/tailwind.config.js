@@ -21,6 +21,8 @@ module.exports = {
     './src/Support/Ui.php',
     './src/Support/Chart.php',
     './src/View.php',
+    // The preview's chart gallery (absent on a server; Tailwind skips it).
+    '../dev/preview/gallery/*.php',
   ],
   // theme.js resolves "system" and always sets data-theme on <html>.
   darkMode: ['selector', '[data-theme="dark"]'],
