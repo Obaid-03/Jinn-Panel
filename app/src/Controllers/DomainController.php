@@ -366,6 +366,26 @@ final class DomainController
     }
 
     /** Exposed files: archives, dumps, backups, logs reachable over the web. */
+    /** The domain's Stats tab: visitors, requests, status codes, page time, top pages and referrers. */
+    public static function stats(array $params): void
+    {
+        Auth::requireRole(['user']);
+        $d = self::owned(Auth::user(), (int) ($params['id'] ?? 0));
+        $range = StatsService::range($_GET['range'] ?? null);
+        $stats = null;
+        try {
+            $stats = StatsService::domain((int) $d['id'], $range);
+        } catch (PDOException $e) {
+            error_log('statistics: ' . $e->getMessage());
+        }
+        View::render('cpanel/domain_stats', [
+            'title' => 'Stats · ' . $d['domain_name'],
+            'd' => $d,
+            'range' => $range,
+            'stats' => $stats,
+        ], 'cpanel');
+    }
+
     public static function exposed(array $params): void
     {
         Auth::requireRole(['user']);

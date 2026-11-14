@@ -138,10 +138,14 @@ final class StatsService
         $total = array_sum(array_map('array_sum', $stacks));
 
         $seconds = ['24h' => 86400, '7d' => 7 * 86400, '30d' => 30 * 86400][$range];
-        $prev = $pdo->prepare("SELECT COALESCE(SUM(h.$metric), 0) FROM stat_domain_hourly h WHERE $where AND h.hour >= ? AND h.hour < ?");
-        $from = strtotime($b['from']);
-        $prev->execute(array_merge($params, [date('Y-m-d H:i:s', $from - $seconds), $b['from']]));
-        $previous = (float) $prev->fetchColumn();
+        $prevStart = date('Y-m-d H:i:s', strtotime($b['from']) - $seconds);
+        $previous = 0.0;
+        // Only compare with a previous period that was counted from its start.
+        if (self::countedSince($where, $params) <= $prevStart) {
+            $prev = $pdo->prepare("SELECT COALESCE(SUM(h.$metric), 0) FROM stat_domain_hourly h WHERE $where AND h.hour >= ? AND h.hour < ?");
+            $prev->execute(array_merge($params, [$prevStart, $b['from']]));
+            $previous = (float) $prev->fetchColumn();
+        }
 
         // A spike: the busiest site at 3x or more of its usual (median) bucket.
         $spike = null;
@@ -499,20 +503,28 @@ final class StatsService
         return $out;
     }
 
+    /** One site over a range, for its Stats tab (see summary()). @return array<string,mixed> */
+    public static function domain(int $domainId, string $range): array
+    {
+        return self::summary($range, ['domain' => $domainId]);
+    }
+
     /**
-     * One site over a range, for its Stats tab: totals and the previous
-     * period's, visitors and requests per bucket, status classes, page time,
-     * top pages and referrers.
+     * A site (['domain' => id]) or an account's sites (['user' => id]) over a
+     * range: totals and the previous period's; per bucket visitors,
+     * requests, bytes, pages, page time and status classes; top pages and
+     * referrers (one site only); when counting started.
      *
      * @return array<string,mixed>
      */
-    public static function domain(int $domainId, string $range): array
+    public static function summary(string $range, array $scope): array
     {
         $pdo = Database::app();
         $b = self::buckets($range);
-        $cols = 'SUM(requests) requests, SUM(bytes) bytes, SUM(visitors) visitors, SUM(pages) pages, SUM(s2xx) s2xx, SUM(s3xx) s3xx, SUM(s4xx) s4xx, SUM(s5xx) s5xx, SUM(time_ms) time_ms, SUM(slow) slow';
-        $q = $pdo->prepare('SELECT ' . self::bucketSql($b, 'hour') . " k, $cols FROM stat_domain_hourly WHERE domain_id = ? AND hour >= ? GROUP BY k");
-        $q->execute([$domainId, $b['from']]);
+        [$where, $params] = self::scopeSql($scope);
+        $cols = 'SUM(h.requests) requests, SUM(h.bytes) bytes, SUM(h.visitors) visitors, SUM(h.pages) pages, SUM(h.s2xx) s2xx, SUM(h.s3xx) s3xx, SUM(h.s4xx) s4xx, SUM(h.s5xx) s5xx, SUM(h.time_ms) time_ms, SUM(h.slow) slow';
+        $q = $pdo->prepare('SELECT ' . self::bucketSql($b, 'h.hour') . " k, $cols FROM stat_domain_hourly h WHERE $where AND h.hour >= ? GROUP BY k");
+        $q->execute(array_merge($params, [$b['from']]));
         $by = [];
         foreach ($q->fetchAll() as $r) {
             $by[$r['k']] = $r;
@@ -532,32 +544,78 @@ final class StatsService
             $series['status'][] = [(float) ($r['s2xx'] ?? 0), (float) ($r['s3xx'] ?? 0), (float) ($r['s4xx'] ?? 0), (float) ($r['s5xx'] ?? 0)];
         }
         $seconds = ['24h' => 86400, '7d' => 7 * 86400, '30d' => 30 * 86400][$range];
-        $p = $pdo->prepare("SELECT $cols FROM stat_domain_hourly WHERE domain_id = ? AND hour >= ? AND hour < ?");
-        $from = strtotime($b['from']);
-        $p->execute([$domainId, date('Y-m-d H:i:s', $from - $seconds), $b['from']]);
-        $prev = $p->fetch() ?: [];
+        $prevStart = date('Y-m-d H:i:s', strtotime($b['from']) - $seconds);
+        $since = self::countedSince($where, $params);
+        $prev = [];
+        if ($since <= $prevStart) {
+            $p = $pdo->prepare("SELECT $cols FROM stat_domain_hourly h WHERE $where AND h.hour >= ? AND h.hour < ?");
+            $p->execute(array_merge($params, [$prevStart, $b['from']]));
+            $prev = array_map('floatval', $p->fetch() ?: []);
+        }
 
-        $fromDay = substr($b['from'], 0, 10);
-        $top = $pdo->prepare('SELECT kind, value, SUM(hits) hits FROM stat_domain_top WHERE domain_id = ? AND day >= ? GROUP BY kind, value ORDER BY hits DESC');
-        $top->execute([$domainId, $fromDay]);
         $pages = $refs = [];
-        foreach ($top->fetchAll() as $r) {
-            if ($r['value'] === AccessLogStats::OTHER) {
-                continue;
-            }
-            if ($r['kind'] === 'page' && count($pages) < 10) {
-                $pages[] = [(string) $r['value'], (float) $r['hits']];
-            } elseif ($r['kind'] === 'referrer' && count($refs) < 10) {
-                $refs[] = [(string) $r['value'], (float) $r['hits']];
+        if (isset($scope['domain'])) {
+            $top = $pdo->prepare('SELECT kind, value, SUM(hits) hits FROM stat_domain_top WHERE domain_id = ? AND day >= ? GROUP BY kind, value ORDER BY hits DESC');
+            $top->execute([(int) $scope['domain'], substr($b['from'], 0, 10)]);
+            foreach ($top->fetchAll() as $r) {
+                if ($r['value'] === AccessLogStats::OTHER) {
+                    continue;
+                }
+                if ($r['kind'] === 'page' && count($pages) < 10) {
+                    $pages[] = [(string) $r['value'], (float) $r['hits']];
+                } elseif ($r['kind'] === 'referrer' && count($refs) < 10) {
+                    $refs[] = [(string) $r['value'], (float) $r['hits']];
+                }
             }
         }
-        $first = $pdo->prepare('SELECT MIN(hour) FROM stat_domain_hourly WHERE domain_id = ?');
-        $first->execute([$domainId]);
-
         return [
             'range' => $range, 'per' => $b['per'], 'labels' => $b['labels'], 'series' => $series, 'sum' => $sum,
-            'prev' => array_map('floatval', $prev), 'pages' => $pages, 'referrers' => $refs, 'since' => $first->fetchColumn() ?: null,
+            'prev' => $prev, 'pages' => $pages, 'referrers' => $refs, 'since' => $since === '9999' ? null : $since,
         ];
+    }
+
+    /**
+     * Visitors per day over the last $days days for each site, and its
+     * visitors and requests in total (the customer's list of sites).
+     *
+     * @param list<int> $domainIds
+     * @return array<int, array{days:list<float>, visitors:float, requests:float}>
+     */
+    public static function domainSparklines(array $domainIds, int $days = 14): array
+    {
+        $domainIds = array_values(array_unique(array_map('intval', $domainIds)));
+        if (!$domainIds) {
+            return [];
+        }
+        $in = implode(',', array_fill(0, count($domainIds), '?'));
+        $since = date('Y-m-d', strtotime('-' . ($days - 1) . ' day'));
+        $q = Database::app()->prepare("SELECT domain_id, DATE(hour) d, SUM(visitors) v, SUM(requests) r FROM stat_domain_hourly
+                                       WHERE domain_id IN ($in) AND hour >= ? GROUP BY domain_id, d");
+        $q->execute(array_merge($domainIds, [$since . ' 00:00:00']));
+        $by = [];
+        foreach ($q->fetchAll() as $r) {
+            $by[(int) $r['domain_id']][$r['d']] = [(float) $r['v'], (float) $r['r']];
+        }
+        $out = [];
+        foreach ($domainIds as $id) {
+            $row = ['days' => [], 'visitors' => 0.0, 'requests' => 0.0];
+            for ($i = $days - 1; $i >= 0; $i--) {
+                [$v, $r] = $by[$id][date('Y-m-d', strtotime("-$i day"))] ?? [0.0, 0.0];
+                $row['days'][] = $v;
+                $row['visitors'] += $v;
+                $row['requests'] += $r;
+            }
+            $out[$id] = $row;
+        }
+        return $out;
+    }
+
+    /** The first hour counted in a scope ('9999' for none yet), so a change is only shown against a fully counted period. */
+    private static function countedSince(string $where, array $params): string
+    {
+        $q = Database::app()->prepare("SELECT MIN(h.hour) FROM stat_domain_hourly h WHERE $where");
+        $q->execute($params);
+        return (string) ($q->fetchColumn() ?: '9999');
     }
 
     /** @param list<array{0:float,1:float}> $pts */

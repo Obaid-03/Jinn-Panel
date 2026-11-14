@@ -47,6 +47,11 @@ emails need both).
   server's CPU, memory and network over time, and a sortable table of sites.
 - **Account page**: disk use and data sent over the last 30 days against
   the package, and when each limit will be reached at the current rate.
+- **Customer dashboard**: visitors to their sites over 24 hours, 7 or 30
+  days, their plan with the day disk or bandwidth runs out at the current
+  rate, and each site's 14-day visitors, instead of shortcut tiles.
+- **Stats tab on every domain**: visitors, requests, data sent, page time,
+  answers by status, top pages and referring sites.
 - **Accounts list**: search, filters with counts, sorting and pages in the
   database (fast with thousands of accounts), a 14-day requests trend per
   account.

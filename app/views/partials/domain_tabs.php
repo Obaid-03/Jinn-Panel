@@ -1,7 +1,7 @@
 <?php
 /**
  * Header and tabs shared by the pages of one domain (overview, routes,
- * exposed files). Expects $d (the domain row) and $tab: 'overview' | 'routes' | 'exposed'.
+ * exposed files, stats). Expects $d (the domain row) and $tab: 'overview' | 'stats' | 'routes' | 'exposed'.
  * Sets the breadcrumbs and the page-header actions.
  */
 $tabId = (int) $d['id'];
@@ -12,6 +12,7 @@ View::slot('actions',
     . (Features::has('file_manager') ? '<a href="/cpanel/files?domain_id=' . $tabId . '" class="btn btn-secondary">' . icon('folder') . 'Files</a>' : ''));
 $tabHrefs = [
     'overview' => "/cpanel/domains/$tabId",
+    'stats' => "/cpanel/domains/$tabId/stats",
     'routes' => "/cpanel/domains/$tabId/routes",
     'exposed' => "/cpanel/domains/$tabId/exposed",
 ];
@@ -19,6 +20,7 @@ $tabHrefs = [
 <div class="mb-6">
     <?= Ui::tabs([
         [$tabHrefs['overview'], 'Overview', 'globe'],
+        [$tabHrefs['stats'], 'Stats', 'chart'],
         [$tabHrefs['routes'], 'Routes & .htaccess', 'route'],
         [$tabHrefs['exposed'], 'Exposed files', 'shield'],
     ], $tabHrefs[$tab] ?? '', 'Domain sections') ?>

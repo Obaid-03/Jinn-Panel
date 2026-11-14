@@ -417,9 +417,20 @@ final class Chart
         foreach ($ticks as $t) {
             $top = round(100 - $t / $max * 100, 3);
             $html .= '<div class="' . ($t == 0 ? 'chart-base' : 'chart-grid') . '" style="top:' . $top . '%"></div>'
-                . '<span class="chart-ytick" style="right:100%;top:' . $top . '%">' . e(self::format($t, $fmt)) . '</span>';
+                . '<span class="chart-ytick" style="right:100%;top:' . $top . '%">' . e(self::tick($t, $max, $fmt)) . '</span>';
         }
         return $html;
+    }
+
+    /** An axis label: bytes all in the top tick's unit (0.5 GB, 1 GB, not 512 MB, 1 GB). */
+    private static function tick(float $t, float $max, string $fmt): string
+    {
+        if ($fmt !== 'bytes' || $max < 1024) {
+            return self::format($t, $fmt);
+        }
+        $i = min(5, (int) floor(log($max, 1024)));
+        $v = $t / 1024 ** $i;
+        return ($v == 0 ? '0' : rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.')) . ' ' . ['B', 'KB', 'MB', 'GB', 'TB', 'PB'][$i];
     }
 
     /** X labels every $every points; every other one drops out on phones, where they would collide. */

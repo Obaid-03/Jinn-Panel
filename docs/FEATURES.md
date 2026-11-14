@@ -451,11 +451,27 @@ Jobs**, **Cache**, **Backups**. Login security is the shield icon.
 
 ### Dashboard
 
-**Package usage**: domains, databases, email accounts and FTP accounts
-against the package, plus measured **Disk space** (files / databases / mail
-breakdown) and **Bandwidth this month**, with warnings when either is used
-up. Then shortcut cards to every section. The same usage box sits on top of
-Domains, Databases, Email and FTP.
+- **Visitors to your sites** over 24 hours, 7 days or 30 days, with
+  requests, data sent and the share of server errors, and the change on the
+  previous period. The range links reload only this chart.
+- **Your plan**: disk used (files / databases / mail) and this month's
+  bandwidth against the package, each with the day it runs out at the
+  current rate, and domains, databases, mailboxes and SFTP logins against
+  their limits. The same usage box sits on top of Domains, Databases,
+  Email and FTP.
+- **Your sites**, busiest first: visitors per day over 14 days, visitors and
+  requests, the certificate, and **Stats**.
+- **Connection details**: server, IP address, SFTP host and port, username.
+
+### Stats (each domain)
+
+A tab on every domain, next to Overview: visitors, requests, data sent
+and average page time over 24 hours, 7 days or 30 days, each with the change
+on the previous period; visitors over time; answers by status (2xx, 3xx,
+4xx, 5xx); page time and how many pages took over a second; top pages and
+referring sites; data sent. From the web server's log every 5 minutes. A
+visitor is one browser counted once a day; robots are left out and no IP
+address is stored.
 
 ### Domains
 
@@ -715,8 +731,9 @@ Checked against the code; none of these exist today.
 - **No per-mailbox quota**, spam filter settings or mail filters for
   customers (the admin can tune Stalwart's spam settings server-wide).
 - **No plain FTP** - SFTP/SCP only.
-- **No visitor statistics** (AWStats-style) or raw access logs for
-  customers; no per-account usage view in WHM.
+- **No raw access logs** for customers (statistics only: the Stats tab),
+  and statistics start with the update that added them (no import of
+  older logs).
 - **Per-site PHP settings, page cache and extensions** only cover the
   default PHP version.
 - **No Node.js, Python or other app runtimes** - PHP and static files.
