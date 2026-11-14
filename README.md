@@ -144,8 +144,6 @@ secrets).
   by process count and `memory_limit` only.
 - **AlmaLinux 10 only**, and it expects the server to itself.
 - **No billing integration (WHMCS etc.), external API or app installer.**
-- **Emails**: welcome, password reset and server alerts only - no quota or
-  suspension notices yet.
 - No SSH access for customers, no visitor statistics (AWStats-style).
 - No DNSSEC, custom (uploaded) certificates or per-mailbox quotas.
 - Hard disk quotas cover files only; databases and mail are measured and

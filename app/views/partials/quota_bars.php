@@ -46,8 +46,8 @@ $measured = Auth::role() === 'user' && !$compact ? Quota::measured((int) Auth::i
         <?php endif; ?>
         <div class="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
             <?php foreach ($rows as [$label, $used, $limit]):
-                $pct = $limit > 0 ? $used / $limit * 100 : 100; ?>
-            <?= Ui::meter($label, (int) $used . ' / ' . $limit, $pct, $pct >= 100 ? 'warning' : 'accent') ?>
+                $pct = Quota::unlimited($limit) ? 0 : ($limit > 0 ? $used / $limit * 100 : 100); ?>
+            <?= Ui::meter($label, (int) $used . ' / ' . Quota::fmtCount($limit), $pct, $pct >= 100 ? 'warning' : 'accent') ?>
             <?php endforeach; ?>
         </div>
         <?php if ($measured !== null && $measured['over']): ?>

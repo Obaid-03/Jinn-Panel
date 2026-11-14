@@ -41,7 +41,9 @@ dev/local/serve.sh      # http://127.0.0.1:8088 (Chrome or Firefox)
 
 Pages that talk to an account's PHP pool (File Manager, Cache) wait about
 15 seconds per domain for pools that don't exist locally, then show an
-error; mail, DNS and SFTP actions fail with an error. `FORCE=1
+error; mail, DNS and SFTP actions fail with an error. Mail the panel
+sends (welcome, reset, suspension, quota) is written to
+`dev/local/outbox.log` instead of being delivered. `FORCE=1
 dev/local/setup.sh` starts over.
 
 **Everything else** (provisioning, the worker, mail, DNS) is built against

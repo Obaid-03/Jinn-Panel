@@ -39,6 +39,7 @@ function sample_packages(): array
         ['id' => 2, 'owner_id' => null, 'name' => 'Starter', 'disk_quota_mb' => 1024, 'bandwidth_mb' => 10240, 'max_domains' => 1, 'max_databases' => 1, 'max_email_accounts' => 5, 'max_ftp_accounts' => 1, 'max_accounts' => 0, 'owner_username' => null, 'account_count' => 0,
             'features' => '{"file_manager":true,"cron":false,"backups":true,"dns_editor":true,"php_versions":false,"aliases":false,"routes":false,"object_cache":false,"database_access":true,"ssh_keys":true}'],
         ['id' => 3, 'owner_id' => null, 'name' => 'Reseller 50', 'disk_quota_mb' => 51200, 'bandwidth_mb' => 512000, 'max_domains' => 50, 'max_databases' => 50, 'max_email_accounts' => 200, 'max_ftp_accounts' => 20, 'max_accounts' => 50, 'owner_username' => null, 'account_count' => 1],
+        ['id' => 5, 'owner_id' => null, 'name' => 'Unlimited', 'disk_quota_mb' => -1, 'bandwidth_mb' => -1, 'max_domains' => -1, 'max_databases' => -1, 'max_email_accounts' => -1, 'max_ftp_accounts' => 10, 'max_accounts' => 0, 'owner_username' => null, 'account_count' => 1],
         ['id' => 4, 'owner_id' => 2, 'name' => 'Agency Pro', 'disk_quota_mb' => 20480, 'bandwidth_mb' => 204800, 'max_domains' => 10, 'max_databases' => 20, 'max_email_accounts' => 50, 'max_ftp_accounts' => 5, 'max_accounts' => 0, 'owner_username' => 'resell', 'account_count' => 2],
     ];
 }
@@ -51,6 +52,17 @@ function sample_accounts(): array
         ['id' => 10, 'username' => 'acme', 'email' => 'owner@acme.test', 'role' => 'user', 'status' => 'active', 'package_id' => 1, 'package_name' => 'Business', 'reseller_username' => 'resell', 'php_exec' => 1, 'totp_secret_enc' => 'x', 'full_name' => 'Acme Ltd'] + $u,
         ['id' => 11, 'username' => 'bakery', 'email' => 'hello@bakery.test', 'role' => 'user', 'status' => 'suspended', 'package_id' => 2, 'package_name' => 'Starter', 'reseller_username' => null] + $u,
         ['id' => 12, 'username' => 'blogger', 'email' => 'me@blogger.test', 'role' => 'user', 'status' => 'active', 'package_id' => 1, 'package_name' => 'Business', 'reseller_username' => null] + $u,
+    ];
+}
+
+function sample_alloc(bool $over = false): array
+{
+    return [
+        'package' => sample_packages()[3],
+        'accounts' => ['used' => 12, 'cap' => 50],
+        'disk' => ['used' => $over ? 61440 : 30720, 'cap' => 51200],
+        'bandwidth' => ['used' => 307200, 'cap' => 512000],
+        'domains' => ['used' => $over ? -1 : 31, 'cap' => 50],
     ];
 }
 

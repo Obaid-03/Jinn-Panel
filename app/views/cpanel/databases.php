@@ -43,7 +43,7 @@ foreach ($grants as $u => $dbsOf) {
 }
 
 $compact = true;
-$dbFull = $pkg && (int) $usage['databases'] >= (int) $pkg['max_databases'];
+$dbFull = $pkg && !Quota::unlimited($pkg['max_databases']) && (int) $usage['databases'] >= (int) $pkg['max_databases'];
 ?>
 <div class="stack">
     <?php include __DIR__ . '/../partials/quota_bars.php'; ?>

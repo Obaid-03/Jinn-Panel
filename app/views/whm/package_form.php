@@ -6,8 +6,18 @@ View::breadcrumbs([['Packages', '/whm/packages'], [$edit ? (string) $pkg['name']
 View::slot('desc', e($edit
     ? 'Changes apply to every account on this package. Lowering a limit deletes nothing; accounts over it just can\'t add more.'
     : 'A set of limits for hosting accounts. Disk and bandwidth are enforced; counts limit what can be created.'));
-$v = fn(string $k, int $default) => $edit ? (string) (int) $pkg[$k] : (string) $default;
-$num = fn(int $min) => ['min' => $min, 'inputmode' => 'numeric', 'class' => 'tabular-nums'];
+View::script('package-form');
+$isUnl = fn(string $k) => $edit && Quota::unlimited($pkg[$k]);
+$v = fn(string $k, int $default) => $edit ? ($isUnl($k) ? '' : (string) (int) $pkg[$k]) : (string) $default;
+$num = fn(int $min) => ['min' => $min, 'inputmode' => 'numeric'];
+/** A limit: the number, and an "Unlimited" box under it (the number is ignored when ticked). */
+$limit = function (string $col, string $label, int $default, int $min, array $o = []) use ($v, $isUnl, $num): string {
+    $attrs = $num($min) + ['data-limit' => $col] + ($isUnl($col) ? ['placeholder' => 'Unlimited'] : []);
+    return '<div class="' . e($o['wrap'] ?? '') . '">'
+        . Ui::field($col, $label, ['type' => 'number', 'value' => $v($col, $default), 'class' => 'tabular-nums', 'attrs' => $attrs] + array_intersect_key($o, ['suffix' => 1, 'hint' => 1]))
+        . Ui::checkbox('unlimited[' . $col . ']', 'Unlimited', $isUnl($col), ['wrap' => 'mt-2 text-muted', 'attrs' => ['data-unlimited' => $col]])
+        . '</div>';
+};
 ?>
 <form method="post" action="<?= $edit ? '/whm/packages/' . (int) $pkg['id'] : '/whm/packages' ?>" class="max-w-3xl">
     <?= Csrf::field() ?>
@@ -21,18 +31,18 @@ $num = fn(int $min) => ['min' => $min, 'inputmode' => 'numeric', 'class' => 'tab
             <div>
                 <h2 class="section-title mb-3">Resources</h2>
                 <div class="grid gap-5 sm:grid-cols-2">
-                    <?= Ui::field('disk_quota_mb', 'Disk space', ['type' => 'number', 'value' => $v('disk_quota_mb', 1024), 'suffix' => 'MB', 'hint' => 'Files, databases and mail together. 1024 MB = 1 GB.', 'attrs' => $num(1)]) ?>
-                    <?= Ui::field('bandwidth_mb', 'Bandwidth per month', ['type' => 'number', 'value' => $v('bandwidth_mb', 10240), 'suffix' => 'MB', 'hint' => 'Over it, the account\'s sites answer 509 until next month.', 'attrs' => $num(1)]) ?>
+                    <?= $limit('disk_quota_mb', 'Disk space', 1024, 1, ['suffix' => 'MB', 'hint' => 'Files, databases and mail together. 1024 MB = 1 GB.']) ?>
+                    <?= $limit('bandwidth_mb', 'Bandwidth per month', 10240, 1, ['suffix' => 'MB', 'hint' => 'Over it, the account\'s sites answer 509 until next month.']) ?>
                 </div>
             </div>
 
             <div>
                 <h2 class="section-title mb-3">Limits</h2>
                 <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                    <?= Ui::field('max_domains', 'Domains', ['type' => 'number', 'value' => $v('max_domains', 1), 'attrs' => $num(1)]) ?>
-                    <?= Ui::field('max_databases', 'Databases', ['type' => 'number', 'value' => $v('max_databases', 1), 'attrs' => $num(1)]) ?>
-                    <?= Ui::field('max_email_accounts', 'Mailboxes', ['type' => 'number', 'value' => $v('max_email_accounts', 5), 'attrs' => $num(0)]) ?>
-                    <?= Ui::field('max_ftp_accounts', 'SFTP logins', ['type' => 'number', 'value' => $v('max_ftp_accounts', 1), 'attrs' => $num(0)]) ?>
+                    <?= $limit('max_domains', 'Domains', 1, 1) ?>
+                    <?= $limit('max_databases', 'Databases', 1, 1) ?>
+                    <?= $limit('max_email_accounts', 'Mailboxes', 5, 0) ?>
+                    <?= $limit('max_ftp_accounts', 'SFTP logins', 1, 0) ?>
                 </div>
             </div>
 
@@ -50,7 +60,7 @@ $num = fn(int $min) => ['min' => $min, 'inputmode' => 'numeric', 'class' => 'tab
             <?php if (Auth::isAdmin()): ?>
             <div>
                 <h2 class="section-title mb-3">Resellers</h2>
-                <?= Ui::field('max_accounts', 'Accounts a reseller on this package may create', ['type' => 'number', 'value' => $v('max_accounts', 0), 'hint' => '0 = none. Only matters when the package is given to a reseller.', 'wrap' => 'max-w-sm', 'attrs' => $num(0)]) ?>
+                <?= $limit('max_accounts', 'Accounts a reseller on this package may create', 0, 0, ['hint' => '0 = none. For a reseller, this package\'s disk, bandwidth and domains are also what its customers\' packages may add up to.', 'wrap' => 'max-w-sm']) ?>
             </div>
             <?php endif; ?>
         </div>

@@ -41,6 +41,7 @@ $router->get('/whm', ['WhmDashboardController', 'index']);
 $router->get('/whm/accounts', ['AccountController', 'index']);
 $router->get('/whm/accounts/create', ['AccountController', 'create']);
 $router->post('/whm/accounts', ['AccountController', 'store']);
+$router->post('/whm/accounts/bulk', ['AccountController', 'bulk']);
 $router->get('/whm/accounts/{id}', ['AccountController', 'show']);
 $router->get('/whm/accounts/{id}/edit', ['AccountController', 'edit']);
 $router->post('/whm/accounts/{id}', ['AccountController', 'update']);
@@ -65,7 +66,10 @@ $router->get('/whm/backups/{id}/download', ['BackupController', 'whmDownload']);
 $router->get('/whm/packages', ['PackageController', 'index']);
 $router->get('/whm/packages/create', ['PackageController', 'create']);
 $router->post('/whm/packages', ['PackageController', 'store']);
+$router->get('/whm/packages/{id}', ['PackageController', 'show']);
 $router->get('/whm/packages/{id}/edit', ['PackageController', 'edit']);
+$router->post('/whm/packages/{id}/duplicate', ['PackageController', 'duplicate']);
+$router->post('/whm/packages/{id}/move', ['PackageController', 'move']);
 $router->post('/whm/packages/{id}', ['PackageController', 'update']);
 $router->post('/whm/packages/{id}/delete', ['PackageController', 'destroy']);
 

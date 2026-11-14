@@ -15,4 +15,6 @@ fi
 watcher=$!
 trap 'kill $watcher 2>/dev/null' EXIT
 echo "JinnPanel (local): http://127.0.0.1:$port"
-php -S "127.0.0.1:$port" -t "$repo/app/public" "$here/router.php"
+echo "Mail the panel sends is written to dev/local/outbox.log, not delivered."
+# mail() appends -f<sender> to this command; sh -c takes it as $0 and ignores it.
+php -d "sendmail_path=/bin/sh -c 'cat >> \"$here/outbox.log\"'" -S "127.0.0.1:$port" -t "$repo/app/public" "$here/router.php"

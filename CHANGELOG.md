@@ -8,7 +8,7 @@ have been cut) - entries are grouped by development milestone instead.
 ## Unreleased - redesign and account basics (2026-11)
 
 Upgrade by re-running the installer: it applies
-`app/migrations/023_accounts_notifications.sql` and `024_package_features.sql`, rebuilds the CSS and
+`app/migrations/023_accounts_notifications.sql`, `024_package_features.sql` and `025_reseller_limits_notices.sql`, rebuilds the CSS and
 re-deploys the worker and pool agent (the file editor and hourly alert
 emails need both).
 
@@ -58,8 +58,19 @@ emails need both).
   panel and hidden from the account's menu when off; each account can be
   switched differently on its page, which also changes its package in one
   step. Migration `024_package_features.sql`.
+- **Unlimited** for any package limit, and a **page per package**: its
+  accounts with usage and totals, limits, features, **Duplicate**, and
+  **Move these accounts** to another package.
+- **Bulk account actions** in WHM > Accounts: change package, suspend,
+  unsuspend, or switch a feature for the selected accounts.
+- **Reseller limits**: a reseller's own package caps what its accounts'
+  packages add up to (disk, bandwidth, domains) and how many accounts it
+  has; shown on its dashboard and its page.
+- **Customer emails**: quota warnings at 90% and when out of disk or
+  bandwidth (once per level), and suspension/unsuspension notices with an
+  optional reason. Switches in WHM > Notifications.
 - **Local run** (`dev/local/`): the real panel against MAMP's MySQL, with
-  demo logins.
+  demo logins; outgoing mail goes to `dev/local/outbox.log`.
 - **Local preview** (`dev/preview/`): every view renders with sample data
   on a laptop; CI renders them all and checks labels and button names.
 

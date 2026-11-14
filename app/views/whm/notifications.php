@@ -27,6 +27,8 @@ View::slot('desc', e('The emails the panel sends by itself: welcome emails, pass
                 <div class="space-y-4">
                     <?= Ui::checkbox('welcome', 'Welcome emails for new accounts', $s['welcome'], ['hint' => 'Offered when an account is created: where to sign in, the username, and a link to choose a password. Passwords are never emailed.']) ?>
                     <?= Ui::checkbox('alerts', 'Email new server alerts', $s['alerts'], ['hint' => 'Checked hourly. Each problem is emailed once when it appears (see Alerts).']) ?>
+                    <?= Ui::checkbox('quota', 'Warn customers about their quota', $s['quota'] ?? true, ['hint' => 'Emails a hosting account at 90% of its disk or monthly bandwidth, and when it runs out. Once per level; bandwidth warnings start over each month.']) ?>
+                    <?= Ui::checkbox('suspension', 'Tell customers when they are suspended or unsuspended', $s['suspension'] ?? true, ['hint' => 'With the reason you give when suspending from the account\'s page.']) ?>
                     <p class="text-sm text-muted">Password reset emails are always on: they're how people get back in.</p>
                 </div>
             </div>

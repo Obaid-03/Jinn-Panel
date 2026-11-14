@@ -25,7 +25,12 @@ final class AccountController
             $accounts = $stmt->fetchAll();
         }
 
-        View::render('whm/accounts', ['title' => 'Accounts', 'accounts' => $accounts, 'me' => $user], 'whm');
+        View::render('whm/accounts', [
+            'title' => 'Accounts',
+            'accounts' => $accounts,
+            'me' => $user,
+            'packages' => AccountService::availablePackages($user),
+        ], 'whm');
     }
 
     public static function show(array $params): void
@@ -43,6 +48,7 @@ final class AccountController
             'packages' => $target['role'] === 'admin' ? [] : AccountService::availablePackages($me),
             'pkgFeatures' => Features::forPackage($o['package']),
             'overrides' => Features::overrides($target),
+            'alloc' => $target['role'] === 'reseller' ? ResellerService::allocation((int) $target['id']) : null,
         ], 'whm');
     }
 
@@ -150,6 +156,70 @@ final class AccountController
         exit;
     }
 
+    /**
+     * WHM > Accounts, several at once: ids[] and op = package | suspend |
+     * unsuspend | feature. Each account is checked like a single action
+     * (scope, last admin, reseller limits); the result says what failed.
+     */
+    public static function bulk(): void
+    {
+        Auth::requireRole(['admin', 'reseller']);
+        Csrf::requireValid();
+        $me = Auth::user();
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array) ($_POST['ids'] ?? [])))));
+        $op = (string) ($_POST['op'] ?? '');
+        if (!$ids || !in_array($op, ['package', 'suspend', 'unsuspend', 'feature'], true)) {
+            self::back($ids ? 'Choose what to do with the selected accounts.' : 'Select at least one account.', true);
+        }
+        $feature = (string) ($_POST['feature'] ?? '');
+        $value = (string) ($_POST['feature_value'] ?? '');
+        if ($op === 'feature' && !isset(Features::LIST[$feature])) {
+            self::back('Choose a feature.', true);
+        }
+        $done = 0;
+        $failed = [];
+        foreach (array_slice($ids, 0, 500) as $id) {
+            $t = AccountService::findScoped($id, $me);
+            if (!$t) {
+                $failed[] = "#$id: not yours to manage";
+                continue;
+            }
+            try {
+                $problem = match ($op) {
+                    'package' => AccountService::changePackage($t, (int) ($_POST['package_id'] ?? 0), $me),
+                    'suspend', 'unsuspend' => implode('; ', AccountService::setStatus($t, $op === 'suspend' ? 'suspended' : 'active')) ?: null,
+                    'feature' => $t['role'] !== 'user' ? 'only hosting accounts have features' : (function () use ($t, $feature, $value) {
+                        AccountService::setFeatureOverride($t, $feature, $value === '' ? null : $value === '1');
+                        return null;
+                    })(),
+                };
+            } catch (Throwable $e) {
+                error_log("bulk $op #{$t['id']}: " . $e->getMessage());
+                $problem = 'failed';
+            }
+            if ($problem !== null) {
+                $failed[] = "{$t['username']}: $problem";
+            } else {
+                $done++;
+                Audit::log("whm.accounts.bulk.$op", $t['username'], (int) $t['id']);
+            }
+        }
+        $what = match ($op) {
+            'package' => 'moved to the new package',
+            'suspend' => 'suspended',
+            'unsuspend' => 'unsuspended',
+            default => 'updated (' . Features::LIST[$feature][0] . ': ' . ($value === '' ? 'as the package' : ($value === '1' ? 'on' : 'off')) . ')',
+        };
+        if ($done) {
+            Flash::ok(Ui::plural($done, 'account') . " $what.");
+        }
+        if ($failed) {
+            Flash::error('Not changed: ' . implode(' · ', array_slice($failed, 0, 8)) . (count($failed) > 8 ? ' · and ' . (count($failed) - 8) . ' more' : ''));
+        }
+        header('Location: /whm/accounts');
+        exit;
+    }
+
     public static function suspend(array $params): void
     {
         self::setStatus($params, 'suspended');
@@ -230,7 +300,7 @@ final class AccountController
         Csrf::requireValid();
         $target = self::scopedOrBack((int) $params['id'], Auth::user());
         Audit::target((int) $target['id']);
-        $problems = AccountService::setStatus($target, $status);
+        $problems = AccountService::setStatus($target, $status, (string) ($_POST['reason'] ?? ''));
         if ($target['role'] !== 'user' && $problems) {
             self::back(ucfirst($problems[0]) . '.', true, (int) $target['id']);
         }

@@ -10,10 +10,9 @@ if ($edit) {
     View::breadcrumbs([['Accounts', '/whm/accounts'], ['Create account']]);
     View::slot('desc', e('A hosting account gets a Linux user, its own PHP and a panel at <domain>/jpanel. A reseller gets WHM to create accounts of its own.'));
 }
-$mb = fn(int $v) => $v >= 1024 ? rtrim(rtrim(number_format($v / 1024, 1), '0'), '.') . ' GB' : $v . ' MB';
 $pkgOptions = ['' => $edit && $account['role'] === 'reseller' ? 'No package' : 'Choose a package…'];
 foreach ($packages as $p) {
-    $pkgOptions[(string) $p['id']] = $p['name'] . ' — ' . $mb((int) $p['disk_quota_mb']) . ', ' . (int) $p['max_domains'] . ' domain' . ((int) $p['max_domains'] === 1 ? '' : 's');
+    $pkgOptions[(string) $p['id']] = $p['name'] . ' — ' . Quota::fmtMb($p['disk_quota_mb']) . ', ' . Quota::fmtCount($p['max_domains']) . ' domain' . ((int) $p['max_domains'] === 1 ? '' : 's');
 }
 $roleText = [
     'user' => ['Hosting account', 'Websites, mail and databases for a customer.'],

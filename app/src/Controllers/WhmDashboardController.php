@@ -40,6 +40,7 @@ final class WhmDashboardController
             'userCount' => $userCount,
             'domainCount' => $domainCount,
             'suspendedCount' => self::suspendedCount($user),
+            'alloc' => $admin ? null : ResellerService::allocation((int) $user['id']),
             'stats' => $admin ? ServerStatus::stats() : null,
             'alerts' => $admin ? AlertService::collect() : [],
             'recent' => $recent->fetchAll(),

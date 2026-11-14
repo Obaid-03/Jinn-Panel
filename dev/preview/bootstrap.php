@@ -88,6 +88,33 @@ final class Database
 /** Package usage for quota_bars.php; fixtures can override with $GLOBALS['preview_quota']. */
 final class Quota
 {
+    // The pure helpers are the real ones (app/src/Support/Quota.php).
+    public const UNLIMITED = -1;
+
+    public static function unlimited(mixed $limit): bool
+    {
+        return (int) $limit < 0;
+    }
+
+    public static function bytes(mixed $mb): int
+    {
+        return (int) $mb > 0 ? (int) $mb * 1048576 : 0;
+    }
+
+    public static function fmtMb(mixed $mb): string
+    {
+        $v = (int) $mb;
+        if ($v < 0) {
+            return 'Unlimited';
+        }
+        return $v >= 1024 ? rtrim(rtrim(number_format($v / 1024, 1), '0'), '.') . ' GB' : $v . ' MB';
+    }
+
+    public static function fmtCount(mixed $n): string
+    {
+        return (int) $n < 0 ? 'Unlimited' : (string) (int) $n;
+    }
+
     public static function usage(int $userId): array
     {
         return $GLOBALS['preview_quota']['usage'] ?? ['domains' => 3, 'databases' => 2, 'email_accounts' => 7, 'ftp_accounts' => 1];

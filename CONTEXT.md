@@ -327,6 +327,17 @@ replaces a tag's set, and a customer record with the same name wins.
   `Features::current()`; `CronService::execute` skips accounts without
   cron. New gated tool: add it to `Features::LIST`, gate its controller,
   hide it in the views.
+- Unlimited: any package limit may be `Quota::UNLIMITED` (-1); read limits
+  through `Quota::unlimited()` / `bytes()` / `fmtMb()` / `fmtCount()`.
+- Reseller limits: `ResellerService::allocation()` / `problems()` - a
+  reseller's own package caps the sum of its accounts' packages (disk,
+  bandwidth, domains) and the account count; enforced in AccountService
+  (create, update, changePackage) and PackageController::update for
+  resellers only.
+- Customer emails: `NotificationService::suspension()` (from
+  AccountService::setStatus) and `quota()`, sent by `UsageNoticeService`
+  after the worker's hourly usage run (account_usage.disk_notice /
+  bw_notice, migration 025).
 - File editor: pool agent ops `edit_read` / `edit_write` (UTF-8 text up to
   1 MB, atomic rename, keeps permissions, refuses if the file changed since
   it was opened). SFTP logins take SSH public keys (`ftp_accounts.public_keys`

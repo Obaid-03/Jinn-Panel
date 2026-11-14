@@ -343,6 +343,28 @@ function test_package_features(): void
     T::same(true, Features::forPackage(['features' => '{"cron":false}'])['backups'], 'a key missing from a package is on');
 }
 
+function test_unlimited_limits(): void
+{
+    T::ok(Quota::unlimited(-1) && Quota::unlimited('-1') && !Quota::unlimited(0) && !Quota::unlimited(5), 'unlimited is -1');
+    T::same(0, Quota::bytes(-1), 'unlimited MB -> 0 bytes (no limit)');
+    T::same(5 * 1048576, Quota::bytes(5), 'MB -> bytes');
+    T::same('Unlimited', Quota::fmtMb(-1), 'fmtMb unlimited');
+    T::same('5 GB', Quota::fmtMb(5120), 'fmtMb GB');
+    T::same('1.5 GB', Quota::fmtMb(1536), 'fmtMb decimals');
+    T::same('512 MB', Quota::fmtMb(512), 'fmtMb MB');
+    T::same('Unlimited', Quota::fmtCount(-1), 'fmtCount unlimited');
+    T::same('0', Quota::fmtCount(0), 'fmtCount none');
+}
+
+function test_quota_notice_levels(): void
+{
+    T::same(0, UsageNoticeService::level(500, 0), 'no limit: never');
+    T::same(0, UsageNoticeService::level(89, 100), 'under 90%');
+    T::same(90, UsageNoticeService::level(90, 100), 'at 90%');
+    T::same(100, UsageNoticeService::level(101, 100), 'over');
+    T::same(100, UsageNoticeService::level(50, 100, true), 'flagged over by the usage run');
+}
+
 // ---------------------------------------------------------------------------
 
 $filter = $argv[1] ?? '';

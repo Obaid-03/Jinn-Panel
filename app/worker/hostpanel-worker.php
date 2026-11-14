@@ -1748,6 +1748,8 @@ function usageRefresh(): void
 {
     panelClasses();
     UsageService::refresh(fn(string $m) => writeOut('worker-usage.log', '[' . date('c') . "] $m\n", true));
+    // Emails accounts that reached 90% / went over their disk or bandwidth.
+    UsageNoticeService::run(fn(string $m) => writeOut('worker-usage.log', '[' . date('c') . "] notice: $m\n", true));
 }
 
 /** Hourly: at the configured hour, the daily backup of everything (its own unit). */

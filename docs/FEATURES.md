@@ -133,6 +133,12 @@ with package, owning reseller (admin view), disk use, domain count, quota
 warnings and status, a filter box, **Log in as** for active hosting
 accounts and **Manage**.
 
+**Several at once**: tick accounts (or all that match the filter), then
+**Change package**, **Suspend**, **Unsuspend** or **Switch a feature**
+(on, off, or back to the package's setting). Each account is checked as if
+done alone (whose it is, the last admin, reseller limits); the result says
+which ones weren't changed and why.
+
 **Create account** - account type (admin only: hosting account, reseller
 or administrator), username, full name, email, password (with a
 generator) and hosting package (administrators have none), and **Send a
@@ -168,7 +174,9 @@ and recent activity, with:
   PHP-FPM pools and its cron jobs.
 - **Reset two-factor** (admin, shown only when two-factor is on) - turns it
   off for that user, removes their recovery codes and ends their sessions.
-- **Suspend / Unsuspend** - for a hosting account, suspension:
+- **Suspend / Unsuspend** - with an optional reason that goes into the
+  customer's email (when suspension emails are on). For a hosting account,
+  suspension:
   - signs it out everywhere and blocks its panel login;
   - makes every site answer `503` "This website is temporarily
     unavailable." (`Retry-After: 3600`) and stops its PHP-FPM pools;
@@ -232,12 +240,21 @@ Pages for tools that are off disappear from the account's menu and
 dashboard; opening one says it isn't in the package.
 
 Disk, bandwidth, domains and databases must be at least 1; email and FTP
-may be 0. There is no "unlimited" value. **Edit** changes a package's name,
-limits and features for every account on it (lowering a limit deletes nothing;
-accounts over it can't add more); a reseller can edit only its own
-packages. A package in use can't be deleted (the list shows how many
-accounts use each). Every
-hosting account gets a package when it's created or migrated.
+may be 0 (none). Any limit can be **Unlimited** (a box under each field):
+nothing is counted against it, and an unlimited disk sets no hard quota.
+**Edit** changes a package's name, limits and features for every account on
+it (lowering a limit deletes nothing; accounts over it can't add more); a
+reseller can edit only its own packages. A package in use can't be deleted
+(the list shows how many accounts use each). Every hosting account gets a
+package when it's created or migrated.
+
+**A package's page** (click its name) lists the accounts on it with their
+disk and bandwidth use, the totals, its limits and features, and:
+
+- **Duplicate** - a copy to start a new package from (a reseller's copy of
+  a global package becomes its own).
+- **Move these accounts** - all of them to another package at once, e.g.
+  before deleting this one. A reseller moves only its own accounts.
 
 ### Resellers
 
@@ -247,9 +264,17 @@ accounts** is above 0 - a reseller without a package can't create
 accounts. A reseller's WHM has Dashboard, Accounts, Packages (create its
 own, delete its own), cPanel Migration (single account or WHM reseller
 sources, public addresses only) and Activity Log. Resellers have no
-hosting of their own, no cPanel side, and no access to Server Config. The
-only reseller-wide cap is the account count; the limits in its custom
-packages are its own choice.
+hosting of their own, no cPanel side, and no access to Server Config.
+
+**Reseller limits.** A reseller's own package is also its allocation: the
+packages of its hosting accounts may add up to at most its disk,
+bandwidth and domain count, and it may have at most "Max accounts"
+accounts. Creating an account, moving one to a bigger package or raising
+one of its own packages is refused when it wouldn't fit (an unlimited
+package never fits a limited reseller). Its dashboard and its page in
+WHM show what's handed out against what's allowed. An administrator isn't
+held to it; a reseller pushed over is shown as over, and can still move
+accounts to smaller packages.
 
 ### cPanel Migration
 
@@ -290,7 +315,11 @@ hourly (once each) when alert emails are on.
 
 ### Notifications (admin)
 
-The mail the panel sends itself, through the local mail server: the **From
+The mail the panel sends itself, through the local mail server. Customer
+emails: **quota warnings** (at 90% of disk or monthly bandwidth, and when
+it runs out - once per level, bandwidth again each month) and
+**suspension notices** (suspended with the reason given, and active
+again). Then the **From
 address** (it must be on a mail domain hosted on this server, or Stalwart
 won't relay it) and name, whether new accounts may get a **welcome email**,
 whether **new alerts are emailed**, and where alerts go (default: every
@@ -650,8 +679,6 @@ Mail, SFTP and panel traffic aren't counted.
 Checked against the code; none of these exist today.
 
 - **Accounts**: a username or account type can't be changed after creation.
-- **No quota or suspension emails** - the panel emails welcome messages,
-  password resets and server alerts, nothing else yet.
 - **No billing integration** (WHMCS, Blesta, ...) and **no API** for
   external use - every action is a browser form with a CSRF token.
 - **One server** - no clustering, no remote DNS secondaries, no DNSSEC.

@@ -23,6 +23,10 @@ $fmtUptime = function (int $s): string {
         <?= Ui::stat('Suspended', (int) $suspendedCount, 'pause', $suspendedCount ? 'Sites offline, logins off' : 'None') ?>
     </div>
 
+    <?php if (!$admin && !empty($alloc)): ?>
+    <?php $allocTitle = 'Your allocation'; include __DIR__ . '/../partials/reseller_allocation.php'; ?>
+    <?php endif; ?>
+
     <?php if ($admin): ?>
     <section class="card" aria-labelledby="attention-title">
         <?= Ui::cardHeader('Needs attention', '', '<a href="/whm/alerts" class="btn btn-ghost btn-sm">All alerts' . icon('chevron-right') . '</a>', id: 'attention-title') ?>

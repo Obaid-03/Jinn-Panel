@@ -15,9 +15,12 @@ return [
         'packages' => sample_packages(),
         'pkgFeatures' => ['file_manager' => true, 'cron' => true, 'backups' => true, 'dns_editor' => true, 'php_versions' => true, 'aliases' => true, 'routes' => false, 'object_cache' => true, 'database_access' => false, 'ssh_keys' => true],
         'overrides' => ['database_access' => true, 'backups' => false],
+        'alloc' => null,
     ],
     'variants' => [
-        'reseller-account' => ['a' => sample_accounts()[0], 'o' => ['package' => sample_packages()[2], 'parent' => null, 'usage' => null, 'domains' => [], 'counts' => ['domains' => 0, 'databases' => 0, 'mailboxes' => 0, 'sftp' => 0, 'accounts' => 12], 'activity' => []]],
+        'reseller-account' => ['alloc' => sample_alloc(), 'a' => sample_accounts()[0], 'o' => ['package' => sample_packages()[2], 'parent' => null, 'usage' => null, 'domains' => [], 'counts' => ['domains' => 0, 'databases' => 0, 'mailboxes' => 0, 'sftp' => 0, 'accounts' => 12], 'activity' => []]],
+        'reseller-over' => ['alloc' => sample_alloc(true), 'a' => sample_accounts()[0], 'o' => ['package' => sample_packages()[2], 'parent' => null, 'usage' => null, 'domains' => [], 'counts' => ['domains' => 0, 'databases' => 0, 'mailboxes' => 0, 'sftp' => 0, 'accounts' => 12], 'activity' => []]],
+        'unlimited-package' => ['o' => ['package' => sample_packages()[3]] + ['parent' => 'resell', 'usage' => null, 'domains' => [], 'counts' => ['domains' => 7, 'databases' => 12, 'mailboxes' => 40, 'sftp' => 2, 'accounts' => 0], 'activity' => []]],
         'suspended' => ['a' => sample_accounts()[2], 'o' => ['usage' => null, 'domains' => [], 'activity' => []] + $o],
         'last-admin' => ['a' => ['id' => 5, 'username' => 'ops', 'email' => 'ops@example.com', 'role' => 'admin', 'status' => 'active', 'full_name' => null, 'parent_id' => null, 'package_id' => null, 'php_exec' => 0, 'totp_secret_enc' => 'x', 'created_at' => '2026-10-01 09:00:00'], 'o' => ['package' => null, 'parent' => null, 'usage' => null, 'domains' => [], 'counts' => ['domains' => 0, 'databases' => 0, 'mailboxes' => 0, 'sftp' => 0, 'accounts' => 0], 'activity' => []], 'lastAdmin' => true],
     ],

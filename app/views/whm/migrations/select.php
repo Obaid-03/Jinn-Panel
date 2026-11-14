@@ -20,11 +20,10 @@ $showOwnerPlan = $whm && !$file;
 $selectable = count($items) - count($conflicts);
 $hasResellers = (bool) array_filter($items, fn($i) => (int) $i['is_reseller'] === 1);
 $cols = 2 + ($showOwnerPlan ? 2 : 0) + ($whm ? 1 : 0);
-$mb = fn(int $v) => $v >= 1024 ? rtrim(rtrim(number_format($v / 1024, 1), '0'), '.') . ' GB' : $v . ' MB';
 
 $packageOptions = ['' => 'Choose a package'];
 foreach ($packages as $p) {
-    $packageOptions[(int) $p['id']] = $p['name'] . ' · ' . $mb((int) $p['disk_quota_mb']) . ' · ' . Ui::plural((int) $p['max_domains'], 'domain');
+    $packageOptions[(int) $p['id']] = $p['name'] . ' · ' . Quota::fmtMb($p['disk_quota_mb']) . ' · ' . (Quota::unlimited($p['max_domains']) ? 'unlimited domains' : Ui::plural((int) $p['max_domains'], 'domain'));
 }
 $owners = [];
 if ($m['source_type'] === 'root') {

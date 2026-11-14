@@ -9,12 +9,13 @@ return [
             'services' => ['mariadb' => 'active', 'frankenphp' => 'active', 'stalwart' => 'active', 'sftpgo' => 'inactive', 'knot' => 'active']],
         'alerts' => sample_alerts(),
         'recent' => sample_activity(),
+        'alloc' => null,
         'logServices' => ['mariadb', 'frankenphp', 'stalwart', 'sftpgo', 'knot'],
         'selectedLog' => 'frankenphp',
         'logContent' => "Nov 14 09:12:01 server frankenphp[812]: {\"level\":\"info\",\"msg\":\"certificate obtained successfully\",\"identifier\":\"acme.test\"}\nNov 14 09:12:04 server frankenphp[812]: {\"level\":\"info\",\"msg\":\"reloading config\"}",
     ],
     'variants' => [
         'all-clear' => ['alerts' => []],
-        'reseller' => ['role' => 'reseller', 'data' => ['me' => ['id' => 2, 'role' => 'reseller', 'username' => 'resell'], 'stats' => null, 'alerts' => [], 'logServices' => [], 'logContent' => null, 'resellerCount' => 0, 'userCount' => 2, 'domainCount' => 5, 'suspendedCount' => 0]],
+        'reseller' => ['role' => 'reseller', 'data' => ['me' => ['id' => 2, 'role' => 'reseller', 'username' => 'resell'], 'stats' => null, 'alerts' => [], 'logServices' => [], 'logContent' => null, 'resellerCount' => 0, 'userCount' => 2, 'domainCount' => 5, 'suspendedCount' => 0, 'alloc' => sample_alloc()]],
     ],
 ];

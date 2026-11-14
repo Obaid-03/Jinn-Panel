@@ -94,8 +94,6 @@ conflicting figures, so check it directly.
   One busy site can slow down the others.
 - **Ecosystem.** No billing/WHMCS integration, no external API, no
   one-click app installer, no marketplace.
-- **Notifications are basic**: welcome, password reset and server alert
-  emails, but no quota or suspension notices to customers yet.
 - **No DNSSEC**, no uploaded (custom) certificates, no per-mailbox
   quotas.
 - **More than one server.** No DNS clustering, no multi-server management,

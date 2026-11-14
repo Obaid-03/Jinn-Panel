@@ -17,6 +17,8 @@ final class NotificationService
             'admin_email' => Settings::get('notify_admin_email'),
             'welcome' => Settings::get('notify_welcome', '1') === '1',
             'alerts' => Settings::get('notify_alerts', '1') === '1',
+            'quota' => Settings::get('notify_quota', '1') === '1',
+            'suspension' => Settings::get('notify_suspension', '1') === '1',
         ];
     }
 
@@ -39,6 +41,8 @@ final class NotificationService
         Settings::set('notify_admin_email', $admin);
         Settings::set('notify_welcome', !empty($in['welcome']) ? '1' : '0');
         Settings::set('notify_alerts', !empty($in['alerts']) ? '1' : '0');
+        Settings::set('notify_quota', !empty($in['quota']) ? '1' : '0');
+        Settings::set('notify_suspension', !empty($in['suspension']) ? '1' : '0');
     }
 
     /** Where alerts go: the configured addresses, else every active admin's email. @return list<string> */
@@ -103,6 +107,54 @@ final class NotificationService
             $sent += Mailer::send($to, '[' . Config::SERVER_HOSTNAME . '] ' . (count($alerts) === 1 ? $alerts[0]['title'] : count($alerts) . ' new server alerts'), $text) ? 1 : 0;
         }
         return $sent;
+    }
+
+    /**
+     * Tells a hosting account it was suspended or is back (WHM >
+     * Notifications: "suspension"). $reason is the admin's note, if any.
+     *
+     * @param array<string,mixed> $user
+     */
+    public static function suspension(array $user, bool $suspended, string $reason = ''): bool
+    {
+        if ($user['role'] !== 'user' || Settings::get('notify_suspension', '1') !== '1') {
+            return false;
+        }
+        $reason = trim(mb_substr($reason, 0, 1000));
+        $text = $suspended
+            ? "Your hosting account \"{$user['username']}\" has been suspended.\n\n"
+                . ($reason !== '' ? "Reason: $reason\n\n" : '')
+                . "While it is suspended its websites show a \"temporarily unavailable\" page, and mail logins, SFTP, databases and cron jobs are switched off. Incoming mail is still accepted and kept.\n\n"
+                . 'Contact your hosting provider to have it turned back on.'
+            : "Your hosting account \"{$user['username']}\" is active again: its websites, mail logins, SFTP, databases and cron jobs are back on.\n\n"
+                . 'Sign in at: https://' . Auth::panelHost() . '/login';
+        $sent = Mailer::send((string) $user['email'], $suspended ? 'Your hosting account is suspended' : 'Your hosting account is active again', $text);
+        Audit::log($suspended ? 'notify.suspended' : 'notify.unsuspended', $sent ? 'emailed ' . $user['email'] : 'email failed', (int) $user['id']);
+        return $sent;
+    }
+
+    /**
+     * Disk or bandwidth warning to a hosting account ($level 90 = nearly
+     * full, 100 = over). Sent once per level by UsageNoticeService.
+     *
+     * @param array<string,mixed> $user
+     */
+    public static function quota(array $user, string $what, int $level, int $used, int $limit): bool
+    {
+        $amount = fmt_bytes($used) . ' of ' . fmt_bytes($limit);
+        if ($what === 'disk') {
+            $subject = $level >= 100 ? 'Your hosting account is out of disk space' : 'Your hosting account is nearly out of disk space';
+            $text = $level >= 100
+                ? "Your hosting account \"{$user['username']}\" is over its disk space ($amount).\n\nUntil it's back under, uploads, new databases, mailboxes and domains are refused. Delete files, old backups, databases or mail you no longer need - or ask your hosting provider for a bigger package."
+                : "Your hosting account \"{$user['username']}\" has used " . (int) round($used / max(1, $limit) * 100) . "% of its disk space ($amount).\n\nWhen it's full, uploads, new databases, mailboxes and domains are refused. Now is a good time to clean up, or to ask for a bigger package.";
+        } else {
+            $subject = $level >= 100 ? 'Your websites are paused: monthly bandwidth used up' : 'Your hosting account is nearly out of bandwidth this month';
+            $text = $level >= 100
+                ? "Your hosting account \"{$user['username']}\" has used all of this month's bandwidth ($amount), so its websites are paused until the 1st of next month.\n\nAsk your hosting provider for a bigger package to bring them back sooner."
+                : "Your hosting account \"{$user['username']}\" has used " . (int) round($used / max(1, $limit) * 100) . "% of this month's bandwidth ($amount).\n\nIf it runs out, its websites are paused until the 1st of next month.";
+        }
+        $text .= "\n\nSee your usage: https://" . Auth::panelHost() . '/cpanel';
+        return Mailer::send((string) $user['email'], $subject, $text);
     }
 
     public static function test(string $to): bool

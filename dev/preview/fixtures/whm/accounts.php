@@ -6,7 +6,7 @@ unset($a);
 array_unshift($accounts, ['id' => 1, 'username' => 'admin', 'email' => 'admin@example.com', 'role' => 'admin', 'status' => 'active', 'package_name' => null, 'reseller_username' => null, 'used_bytes' => null, 'over_disk' => 0, 'over_bandwidth' => 0, 'domain_count' => 0]);
 return [
     'layout' => 'whm', 'role' => 'admin', 'path' => '/whm/accounts',
-    'data' => ['title' => 'Accounts', 'accounts' => $accounts, 'me' => ['id' => 1, 'role' => 'admin', 'username' => 'admin']],
+    'data' => ['title' => 'Accounts', 'accounts' => $accounts, 'me' => ['id' => 1, 'role' => 'admin', 'username' => 'admin'], 'packages' => sample_packages()],
     'variants' => [
         'empty' => ['accounts' => []],
         'reseller' => ['role' => 'reseller', 'data' => ['accounts' => array_slice($accounts, 2, 2), 'me' => ['id' => 2, 'role' => 'reseller', 'username' => 'resell']]],

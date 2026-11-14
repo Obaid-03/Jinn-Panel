@@ -6,6 +6,7 @@
 /** @var list<array<string,mixed>> $packages packages the viewer may give it */
 /** @var array<string,bool> $pkgFeatures its package's features */
 /** @var array<string,bool> $overrides its own feature switches */
+/** @var array<string,mixed>|null $alloc reseller allocation (resellers) */
 $id = (int) $a['id'];
 $user = $a['role'] === 'user';
 $pkg = $o['package'];
@@ -34,21 +35,21 @@ $roleLabel = ['admin' => 'Administrator', 'reseller' => 'Reseller', 'user' => 'H
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <?php
                     $used = $u ? (int) $u['files_bytes'] + (int) $u['db_bytes'] + (int) $u['mail_bytes'] : 0;
-                    $limit = (int) $pkg['disk_quota_mb'] * 1048576;
+                    $limit = Quota::bytes($pkg['disk_quota_mb']);
                     $pct = $limit > 0 ? $used / $limit * 100 : 0;
-                    echo Ui::meter('Disk', fmt_bytes($used) . ' of ' . fmt_bytes($limit), $pct, Ui::usageTone($pct, !empty($u['over_disk'])),
+                    echo Ui::meter('Disk', fmt_bytes($used) . ' of ' . ($limit ? fmt_bytes($limit) : 'unlimited'), $pct, Ui::usageTone($pct, !empty($u['over_disk'])),
                         $u ? 'Files ' . fmt_bytes((int) $u['files_bytes']) . ' · databases ' . fmt_bytes((int) $u['db_bytes']) . ' · mail ' . fmt_bytes((int) $u['mail_bytes']) : '');
                     $bw = $u && $u['bw_month'] === date('Y-m') ? (int) $u['bw_bytes'] : 0;
-                    $bwLimit = (int) $pkg['bandwidth_mb'] * 1048576;
+                    $bwLimit = Quota::bytes($pkg['bandwidth_mb']);
                     $bwPct = $bwLimit > 0 ? $bw / $bwLimit * 100 : 0;
-                    echo Ui::meter('Bandwidth this month', fmt_bytes($bw) . ' of ' . fmt_bytes($bwLimit), $bwPct, Ui::usageTone($bwPct, !empty($u['over_bandwidth'])), !empty($u['over_bandwidth']) ? 'Used up: its sites answer 509 until next month.' : '');
+                    echo Ui::meter('Bandwidth this month', fmt_bytes($bw) . ' of ' . ($bwLimit ? fmt_bytes($bwLimit) : 'unlimited'), $bwPct, Ui::usageTone($bwPct, !empty($u['over_bandwidth'])), !empty($u['over_bandwidth']) ? 'Used up: its sites answer 509 until next month.' : '');
                     ?>
                 </div>
                 <div class="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
                     <?php foreach ([['Domains', 'domains', 'max_domains'], ['Databases', 'databases', 'max_databases'], ['Mailboxes', 'mailboxes', 'max_email_accounts'], ['SFTP logins', 'sftp', 'max_ftp_accounts']] as [$label, $k, $max]):
                         $lim = (int) $pkg[$max];
-                        $p = $lim > 0 ? $o['counts'][$k] / $lim * 100 : 100; ?>
-                    <?= Ui::meter($label, $o['counts'][$k] . ' / ' . $lim, $p, $p >= 100 ? 'warning' : 'accent') ?>
+                        $p = Quota::unlimited($lim) ? 0 : ($lim > 0 ? $o['counts'][$k] / $lim * 100 : 100); ?>
+                    <?= Ui::meter($label, $o['counts'][$k] . ' / ' . Quota::fmtCount($lim), $p, $p >= 100 ? 'warning' : 'accent') ?>
                     <?php endforeach; ?>
                 </div>
                 <?php else: ?>
@@ -170,6 +171,10 @@ $roleLabel = ['admin' => 'Administrator', 'reseller' => 'Reseller', 'user' => 'H
             </dl>
         </section>
 
+        <?php if ($a['role'] === 'reseller' && !empty($alloc)): ?>
+        <?php include __DIR__ . '/../partials/reseller_allocation.php'; ?>
+        <?php endif; ?>
+
         <?php if ($a['role'] === 'reseller'): ?>
         <form method="post" action="/whm/accounts/<?= $id ?>/package" class="card">
             <?= Csrf::field() ?>
@@ -190,20 +195,26 @@ $roleLabel = ['admin' => 'Administrator', 'reseller' => 'Reseller', 'user' => 'H
         <section class="card" aria-labelledby="manage-title">
             <?= Ui::cardHeader('Manage', id: 'manage-title') ?>
             <div class="divide-y divide-line">
-                <div class="flex items-center justify-between gap-4 px-5 py-4">
-                    <div class="min-w-0 text-sm">
-                        <p class="font-medium text-fg"><?= $a['status'] === 'active' ? 'Suspend' : 'Unsuspend' ?></p>
-                        <p class="text-muted"><?= $user ? 'Sites, mail logins, SFTP, MySQL and cron.' : 'Signs it out and blocks sign-in.' ?></p>
+                <div class="px-5 py-4">
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="min-w-0 text-sm">
+                            <p class="font-medium text-fg"><?= $a['status'] === 'active' ? 'Suspend' : 'Unsuspend' ?></p>
+                            <p class="text-muted"><?= $user ? 'Sites, mail logins, SFTP, MySQL and cron.' : 'Signs it out and blocks sign-in.' ?></p>
+                        </div>
+                        <?php if ($a['status'] !== 'active'): ?>
+                        <form method="post" action="/whm/accounts/<?= $id ?>/unsuspend">
+                            <?= Csrf::field() ?>
+                            <button class="btn btn-secondary btn-sm"><?= icon('play') ?>Unsuspend</button>
+                        </form>
+                        <?php endif; ?>
                     </div>
                     <?php if ($a['status'] === 'active'): ?>
-                    <form method="post" action="/whm/accounts/<?= $id ?>/suspend" data-confirm="Suspend <?= e($a['username']) ?>? <?= $user ? 'Its sites go offline (503), and its mail logins, SFTP, MySQL users and cron jobs stop until it\'s unsuspended.' : 'It is signed out and can\'t sign in until unsuspended.' ?>" data-confirm-action="Suspend" data-confirm-danger>
+                    <form method="post" action="/whm/accounts/<?= $id ?>/suspend" class="mt-3 flex items-end gap-2" data-confirm="Suspend <?= e($a['username']) ?>? <?= $user ? 'Its sites go offline (503), and its mail logins, SFTP, MySQL users and cron jobs stop until it\'s unsuspended.' : 'It is signed out and can\'t sign in until unsuspended.' ?>" data-confirm-action="Suspend" data-confirm-danger>
                         <?= Csrf::field() ?>
-                        <button class="btn btn-secondary btn-sm" <?= $lastAdmin ? 'disabled title="The last active administrator can\'t be suspended"' : '' ?>><?= icon('pause') ?>Suspend</button>
-                    </form>
-                    <?php else: ?>
-                    <form method="post" action="/whm/accounts/<?= $id ?>/unsuspend">
-                        <?= Csrf::field() ?>
-                        <button class="btn btn-secondary btn-sm"><?= icon('play') ?>Unsuspend</button>
+                        <?php if ($user): ?>
+                        <?= Ui::field('reason', 'Reason', ['optional' => true, 'placeholder' => 'e.g. unpaid invoice #1042', 'class' => 'input-sm', 'wrap' => 'min-w-0 flex-1', 'attrs' => ['maxlength' => 500, 'title' => 'Included in the email to the customer, if suspension emails are on']]) ?>
+                        <?php endif; ?>
+                        <button class="btn btn-secondary btn-sm shrink-0" <?= $lastAdmin ? 'disabled title="The last active administrator can\'t be suspended"' : '' ?>><?= icon('pause') ?>Suspend</button>
                     </form>
                     <?php endif; ?>
                 </div>

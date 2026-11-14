@@ -88,7 +88,7 @@ final class AccountService
             $limit = (int) ($pkg['max_accounts'] ?? 0);
             $n = $pdo->prepare("SELECT COUNT(*) FROM users WHERE parent_id = ? AND role = 'user'");
             $n->execute([$me['id']]);
-            if ((int) $n->fetchColumn() >= $limit) {
+            if (!Quota::unlimited($limit) && (int) $n->fetchColumn() >= $limit) {
                 $errors[] = $limit > 0 ? "Your reseller package allows $limit accounts - you've reached that." : 'Your reseller package doesn\'t allow creating accounts - ask the server administrator.';
             }
         }
@@ -102,6 +102,10 @@ final class AccountService
         }
         if (!$errors && $packageId && !in_array($packageId, array_map('intval', array_column(self::availablePackages($me), 'id')), true)) {
             $errors[] = 'Invalid package selected.';
+        }
+        // A reseller hands out only what its own package holds.
+        if (!$errors && $me['role'] === 'reseller' && $role === 'user') {
+            array_push($errors, ...ResellerService::problems((int) $me['id'], ['add' => self::packageRow((int) $packageId)]));
         }
         if ($errors) {
             return ['id' => null, 'errors' => $errors];
@@ -161,6 +165,9 @@ final class AccountService
             && !in_array($packageId, array_map('intval', array_column(self::availablePackages($me), 'id')), true)) {
             $errors[] = 'Invalid package selected.';
         }
+        if (!$errors && $me['role'] === 'reseller' && $target['role'] === 'user' && $packageId !== (int) $target['package_id']) {
+            array_push($errors, ...ResellerService::problems((int) $me['id'], ['swap' => [(int) $target['id'] => self::packageRow((int) $packageId)]]));
+        }
         if ($errors) {
             return $errors;
         }
@@ -184,12 +191,12 @@ final class AccountService
      */
     private static function applyPackage(int $userId): void
     {
-        $quotaMb = (int) (Quota::package($userId)['disk_quota_mb'] ?? 0);
+        $quotaBytes = Quota::bytes(Quota::package($userId)['disk_quota_mb'] ?? 0);
         $s = Database::app()->prepare('SELECT username FROM ftp_accounts WHERE user_id = ?');
         $s->execute([$userId]);
         foreach ($s->fetchAll(PDO::FETCH_COLUMN) as $login) {
             try {
-                SftpService::updateUser((string) $login, ['quota_size' => $quotaMb > 0 ? $quotaMb * 1024 * 1024 : 0]);
+                SftpService::updateUser((string) $login, ['quota_size' => $quotaBytes]);
             } catch (Throwable $e) {
                 error_log("package change, sftp $login: " . $e->getMessage());
             }
@@ -213,6 +220,12 @@ final class AccountService
             && !in_array($packageId, array_map('intval', array_column(self::availablePackages($me), 'id')), true)) {
             return 'Invalid package selected.';
         }
+        if ($me['role'] === 'reseller' && $target['role'] === 'user' && $packageId !== (int) $target['package_id']) {
+            $problems = ResellerService::problems((int) $me['id'], ['swap' => [(int) $target['id'] => self::packageRow($packageId)]]);
+            if ($problems) {
+                return implode(' ', $problems);
+            }
+        }
         Database::app()->prepare('UPDATE users SET package_id = ? WHERE id = ?')->execute([$packageId ?: null, $target['id']]);
         if ($target['role'] === 'user' && $packageId !== (int) $target['package_id']) {
             self::applyPackage((int) $target['id']);
@@ -232,6 +245,17 @@ final class AccountService
         Features::forget();
     }
 
+    /** @return array<string,mixed>|null */
+    public static function packageRow(int $id): ?array
+    {
+        if ($id <= 0) {
+            return null;
+        }
+        $s = Database::app()->prepare('SELECT * FROM packages WHERE id = ?');
+        $s->execute([$id]);
+        return $s->fetch() ?: null;
+    }
+
     /** Whether removing/suspending $target would leave no active admin. */
     public static function isLastAdmin(array $target): bool
     {
@@ -247,17 +271,39 @@ final class AccountService
      *
      * @return list<string>
      */
-    public static function setStatus(array $target, string $status): array
+    public static function setStatus(array $target, string $status, string $reason = ''): array
     {
         if ($status === 'suspended' && self::isLastAdmin($target)) {
             return ['the last active administrator can\'t be suspended'];
         }
-        Database::app()->prepare('UPDATE users SET status = ? WHERE id = ?')->execute([$status, $target['id']]);
-        if ($target['role'] === 'user') {
-            return SuspensionService::apply((int) $target['id'], $status === 'suspended');
+        if ($status === $target['status']) {
+            return [];
         }
-        Auth::invalidateSessions((int) $target['id']);
-        return [];
+        Database::app()->prepare('UPDATE users SET status = ? WHERE id = ?')->execute([$status, $target['id']]);
+        if ($target['role'] !== 'user') {
+            Auth::invalidateSessions((int) $target['id']);
+            return [];
+        }
+        $problems = SuspensionService::apply((int) $target['id'], $status === 'suspended');
+        NotificationService::suspension($target, $status === 'suspended', $reason);
+        return $problems;
+    }
+
+    /** One feature switch of an account: true/false, or null = follow its package. */
+    public static function setFeatureOverride(array $target, string $feature, ?bool $on): void
+    {
+        if (!isset(Features::LIST[$feature])) {
+            throw new InvalidArgumentException('Unknown feature.');
+        }
+        $o = Features::overrides($target);
+        if ($on === null) {
+            unset($o[$feature]);
+        } else {
+            $o[$feature] = $on;
+        }
+        Database::app()->prepare('UPDATE users SET feature_overrides = ? WHERE id = ?')
+            ->execute([$o ? (string) json_encode($o) : null, $target['id']]);
+        Features::forget();
     }
 
     /**

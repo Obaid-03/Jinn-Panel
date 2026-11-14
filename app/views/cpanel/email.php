@@ -76,7 +76,7 @@ $extras = function (string $addr, ?array $ar) use ($today, $day, $forwards, $cat
 };
 
 $compact = true;
-$mailFull = $pkg && (int) $usage['email_accounts'] >= (int) $pkg['max_email_accounts'];
+$mailFull = $pkg && !Quota::unlimited($pkg['max_email_accounts']) && (int) $usage['email_accounts'] >= (int) $pkg['max_email_accounts'];
 ?>
 <div class="stack">
     <?php include __DIR__ . '/../partials/quota_bars.php'; ?>
