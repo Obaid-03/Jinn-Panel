@@ -40,6 +40,15 @@ $port = (int) Config::SFTP_PUBLIC_PORT;
                                     'hint' => 'One per line - the contents of a .pub file (e.g. ~/.ssh/id_ed25519.pub), never the private key. Empty removes them. The password keeps working too.',
                                 ]) ?>
                                 <button class="btn btn-primary btn-sm"><?= icon('save') ?>Save keys</button>
+                                <?php $keyFile = '~/.ssh/' . preg_replace('/[^a-z0-9_-]/i', '-', Config::SERVER_HOSTNAME) . '_' . preg_replace('/[^a-z0-9_-]/i', '-', (string) $a['username']); ?>
+                                <div class="border-t border-line pt-3 text-[13px]">
+                                    <p class="font-medium text-fg">No key yet? On your computer (macOS, Linux, or Windows PowerShell):</p>
+                                    <ol class="mt-2 space-y-2 text-muted">
+                                        <li>1. Make a key pair: <?php $cmd = 'ssh-keygen -t ed25519 -f ' . $keyFile . ' -C "' . $a['username'] . '@' . Config::SERVER_HOSTNAME . '"'; ?><span class="mt-1 flex items-start gap-1"><code class="min-w-0 break-all font-mono text-[12.5px] text-fg"><?= e($cmd) ?></code><?= Ui::copy($cmd) ?></span></li>
+                                        <li>2. Paste the contents of <code class="mono"><?= e($keyFile) ?>.pub</code> above and save. The file without .pub is your private key: keep it on your computer.</li>
+                                        <li>3. Connect with the key: <?php $cmd = 'sftp -i ' . $keyFile . ' -P ' . (int) Config::SFTP_PUBLIC_PORT . ' ' . $a['username'] . '@' . Config::SERVER_HOSTNAME; ?><span class="mt-1 flex items-start gap-1"><code class="min-w-0 break-all font-mono text-[12.5px] text-fg"><?= e($cmd) ?></code><?= Ui::copy($cmd) ?></span></li>
+                                    </ol>
+                                </div>
                             </form>
                         </details>
                         <?php endif; ?>

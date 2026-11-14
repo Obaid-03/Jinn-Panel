@@ -246,6 +246,49 @@ final class AccountService
     }
 
     /** @return array<string,mixed>|null */
+    /**
+     * What a hosting account already has beyond a package's limits, and the
+     * features it would lose: shown before moving it to a smaller package
+     * (or making its package smaller), so nobody is surprised.
+     *
+     * @param array<string,mixed> $pkg the package row as it would be
+     * @return list<array{what:string, used:string, limit:string, effect:string}>
+     */
+    public static function overages(array $target, array $pkg): array
+    {
+        if ($target['role'] !== 'user') {
+            return [];
+        }
+        $id = (int) $target['id'];
+        $m = Quota::measured($id);
+        $u = Quota::usage($id);
+        $out = [];
+        $disk = Quota::bytes($pkg['disk_quota_mb'] ?? 0);
+        if ($disk > 0 && $m['used'] > $disk) {
+            $out[] = ['what' => 'Disk', 'used' => fmt_bytes($m['used']), 'limit' => fmt_bytes($disk),
+                'effect' => 'Uploads and new mailboxes, databases and domains are refused until it frees space.'];
+        }
+        $bw = Quota::bytes($pkg['bandwidth_mb'] ?? 0);
+        if ($bw > 0 && $m['bw_used'] > $bw) {
+            $out[] = ['what' => 'Bandwidth this month', 'used' => fmt_bytes($m['bw_used']), 'limit' => fmt_bytes($bw),
+                'effect' => 'Its sites answer "bandwidth exceeded" until ' . date('j M', strtotime('first day of next month')) . '.'];
+        }
+        foreach ([['Domains', 'domains', 'max_domains'], ['Databases', 'databases', 'max_databases'], ['Mailboxes', 'email_accounts', 'max_email_accounts'], ['SFTP logins', 'ftp_accounts', 'max_ftp_accounts']] as [$label, $k, $col]) {
+            $lim = (int) ($pkg[$col] ?? 0);
+            if (!Quota::unlimited($lim) && $u[$k] > $lim) {
+                $out[] = ['what' => $label, 'used' => (string) $u[$k], 'limit' => (string) $lim, 'effect' => 'It keeps them all, but can\'t add more until it is under the limit.'];
+            }
+        }
+        $now = array_replace(Features::forPackage(Quota::package($id)), Features::overrides($target));
+        $next = array_replace(Features::forPackage($pkg), Features::overrides($target));
+        foreach (Features::LIST as $k => [$label]) {
+            if (($now[$k] ?? true) && !($next[$k] ?? true)) {
+                $out[] = ['what' => $label, 'used' => 'On', 'limit' => 'Off', 'effect' => 'Switched off for this account.'];
+            }
+        }
+        return $out;
+    }
+
     public static function packageRow(int $id): ?array
     {
         if ($id <= 0) {

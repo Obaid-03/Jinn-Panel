@@ -20,7 +20,28 @@ final class UsageService
 {
     public const ACCESS_LOG = '/var/log/jinnpanel-web/access.log'; // written by Caddy (frankenphp), read by StatsCollector
 
-    public static function refresh(callable $log): void
+    /**
+     * Measure some accounts now instead of at the next hourly run - after a
+     * package change - so their hard disk quota and bandwidth pause apply
+     * within a minute (the root worker runs it).
+     *
+     * @param list<int> $userIds
+     */
+    public static function applySoon(array $userIds): void
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $userIds))));
+        if (!$ids) {
+            return;
+        }
+        try {
+            SystemWorkerService::enqueue('usage', ['type' => 'usage_refresh', 'users' => array_slice($ids, 0, 5000)]);
+        } catch (Throwable $e) {
+            error_log('usage refresh job: ' . $e->getMessage());
+        }
+    }
+
+    /** @param list<int>|null $only measure just these accounts (null: all) */
+    public static function refresh(callable $log, ?array $only = null): void
     {
         $pdo = Database::app();
         $month = date('Y-m');
@@ -33,7 +54,12 @@ final class UsageService
         $bandwidth = StatsCollector::takeBandwidth();
         $xfs = self::xfsQuotaOn();
 
-        foreach ($pdo->query("SELECT u.id, u.username, p.disk_quota_mb, p.bandwidth_mb FROM users u LEFT JOIN packages p ON p.id = u.package_id WHERE u.role = 'user'")->fetchAll() as $u) {
+        $sql = "SELECT u.id, u.username, p.disk_quota_mb, p.bandwidth_mb FROM users u LEFT JOIN packages p ON p.id = u.package_id WHERE u.role = 'user'";
+        if ($only !== null) {
+            $only = array_values(array_filter(array_map('intval', $only)));
+            $sql .= $only ? ' AND u.id IN (' . implode(',', $only) . ')' : ' AND 0';
+        }
+        foreach ($pdo->query($sql)->fetchAll() as $u) {
             $id = (int) $u['id'];
             $d = $pdo->prepare('SELECT domain_name FROM domains WHERE user_id = ?');
             $d->execute([$id]);
@@ -58,6 +84,7 @@ final class UsageService
             $bw = ($row['bw_month'] === $month ? (int) $row['bw_bytes'] : 0);
             foreach ($domains as $name) {
                 $bw += $bandwidth[strtolower((string) $name)] ?? 0;
+                unset($bandwidth[strtolower((string) $name)]);
             }
 
             $diskLimit = (int) ($u['disk_quota_mb'] ?? 0) * 1048576;
@@ -89,6 +116,10 @@ final class UsageService
                 // Files only (databases and mail live elsewhere), with the package quota as the hard limit.
                 exec('xfs_quota -x -c ' . escapeshellarg('limit -u bhard=' . max(0, (int) ($u['disk_quota_mb'] ?? 0)) . 'm ' . Usernames::linuxUser((string) $u['username'])) . ' / 2>&1');
             }
+        }
+        // A partial run hands the other accounts' bytes back for the next run.
+        if ($only !== null && $bandwidth) {
+            StatsCollector::returnBandwidth($bandwidth);
         }
         if (!empty($reload)) {
             exec('frankenphp reload --config ' . escapeshellarg(Config::FRANKENPHP_CONFIG) . ' --address ' . escapeshellarg(VhostService::ADMIN_SOCKET) . ' --force 2>&1');

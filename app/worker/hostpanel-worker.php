@@ -287,6 +287,11 @@ function runJob(array $job, callable $log): void
         case 'backup_restore':
             backupRestoreStart((int) ($job['backup_id'] ?? 0), (array) ($job['parts'] ?? []), $log);
             break;
+        case 'usage_refresh':
+            // After a package change: these accounts' quotas and bandwidth now, not at the next hour.
+            panelClasses();
+            UsageService::refresh($log, array_map('intval', (array) ($job['users'] ?? [])));
+            break;
         default:
             throw new RuntimeException('Unknown job type: ' . $job['type']);
     }

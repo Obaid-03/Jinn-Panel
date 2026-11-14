@@ -268,12 +268,34 @@ final class AccountController
     {
         Auth::requireRole(['admin', 'reseller']);
         Csrf::requireValid();
-        $target = self::scopedOrBack((int) $params['id'], Auth::user());
+        $me = Auth::user();
+        $target = self::scopedOrBack((int) $params['id'], $me);
+        $pkgId = (int) ($_POST['package_id'] ?? 0);
+        // Moving to a smaller package: first show what it already has beyond the new limits.
+        $pkg = self::offered($pkgId, $me);
+        if ($pkg && ($_POST['confirm'] ?? '') !== '1' && $pkgId !== (int) $target['package_id']) {
+            $over = AccountService::overages($target, $pkg);
+            if ($over) {
+                View::render('whm/package_change', [
+                    'title' => "Move {$target['username']} to {$pkg['name']}?",
+                    'intro' => "\"{$target['username']}\" already has more than {$pkg['name']} allows. Nothing is deleted; this is what happens:",
+                    'rows' => [['account' => $target, 'items' => $over]],
+                    'action' => "/whm/accounts/{$target['id']}/package",
+                    'hidden' => ['package_id' => $pkgId],
+                    'confirm' => 'Move anyway',
+                    'back' => "/whm/accounts/{$target['id']}#features",
+                ], 'whm');
+                return;
+            }
+        }
         Audit::target((int) $target['id']);
-        $problem = AccountService::changePackage($target, (int) ($_POST['package_id'] ?? 0), Auth::user());
-        $problem === null
-            ? Flash::ok("\"{$target['username']}\" is on the new package. Its limits and features apply now (hard disk quotas within the hour).")
-            : Flash::error($problem);
+        $problem = AccountService::changePackage($target, $pkgId, $me);
+        if ($problem === null) {
+            UsageService::applySoon([(int) $target['id']]);
+            Flash::ok("\"{$target['username']}\" is on the new package. Its limits and features apply now, its disk quota within a minute.");
+        } else {
+            Flash::error($problem);
+        }
         header("Location: /whm/accounts/{$target['id']}");
         exit;
     }
@@ -314,7 +336,30 @@ final class AccountController
         if ($op === 'feature' && !isset(Features::LIST[$feature])) {
             self::back('Choose a feature.', true);
         }
+        // Moving to a smaller package: first show which accounts already have more than it allows.
+        if ($op === 'package' && ($_POST['confirm'] ?? '') !== '1' && ($pkg = self::offered((int) ($_POST['package_id'] ?? 0), $me))) {
+            $rows = [];
+            foreach (array_slice($ids, 0, 500) as $id) {
+                $t = AccountService::findScoped($id, $me);
+                if ($t && (int) $t['package_id'] !== (int) $pkg['id'] && ($over = AccountService::overages($t, $pkg))) {
+                    $rows[] = ['account' => $t, 'items' => $over];
+                }
+            }
+            if ($rows) {
+                View::render('whm/package_change', [
+                    'title' => 'Move ' . Ui::plural(count($ids), 'account') . " to {$pkg['name']}?",
+                    'intro' => Ui::plural(count($rows), 'of them already has', 'of them already have') . " more than {$pkg['name']} allows. Nothing is deleted; this is what happens:",
+                    'rows' => $rows,
+                    'action' => '/whm/accounts/bulk',
+                    'hidden' => ['op' => 'package', 'package_id' => (int) $pkg['id'], 'ids' => $ids],
+                    'confirm' => 'Move all ' . count($ids),
+                    'back' => '/whm/accounts',
+                ], 'whm');
+                return;
+            }
+        }
         $done = 0;
+        $moved = [];
         $failed = [];
         foreach (array_slice($ids, 0, 500) as $id) {
             $t = AccountService::findScoped($id, $me);
@@ -339,8 +384,12 @@ final class AccountController
                 $failed[] = "{$t['username']}: $problem";
             } else {
                 $done++;
+                $moved[] = (int) $t['id'];
                 Audit::log("whm.accounts.bulk.$op", $t['username'], (int) $t['id']);
             }
+        }
+        if ($op === 'package') {
+            UsageService::applySoon($moved);
         }
         $what = match ($op) {
             'package' => 'moved to the new package',
@@ -454,6 +503,17 @@ final class AccountController
     }
 
     /** @return array<string,mixed> */
+    /** A package the viewer may give, or null. */
+    private static function offered(int $id, array $me): ?array
+    {
+        foreach (AccountService::availablePackages($me) as $p) {
+            if ((int) $p['id'] === $id) {
+                return AccountService::packageRow($id);
+            }
+        }
+        return null;
+    }
+
     private static function scopedOrBack(int $id, array $me): array
     {
         $target = AccountService::findScoped($id, $me);

@@ -399,7 +399,14 @@ final class StatsCollector
         }
     }
 
-    /** @param array<int,int> $bytes domain id => bytes; @param array<int,string> $names */
+    /** Puts bytes taken with takeBandwidth() but not counted back. @param array<string,int> $byName */
+    public static function returnBandwidth(array $byName): void
+    {
+        $names = array_keys($byName);
+        self::addBandwidth(array_values($byName), $names);
+    }
+
+    /** @param array<int,int> $bytes key => bytes; @param array<int,string> $names the same key => domain name */
     private static function addBandwidth(array $bytes, array $names): void
     {
         if ($bytes === []) {

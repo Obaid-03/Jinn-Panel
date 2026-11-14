@@ -135,7 +135,7 @@ final class PackageController
         View::render('whm/package_form', ['title' => 'Edit ' . $pkg['name'], 'pkg' => $pkg, 'accounts' => (int) $n->fetchColumn()], 'whm');
     }
 
-    /** Changes a package's limits: they apply to every account on it (hard disk quotas at the next hourly run). */
+    /** Changes a package's limits: they apply to every account on it at once (hard disk quotas within a minute). */
     public static function update(array $params): void
     {
         Auth::requireRole(['admin', 'reseller']);
@@ -159,14 +159,40 @@ final class PackageController
                 exit;
             }
         }
+        $features = Features::fromForm($_POST);
+        $members = Database::app()->prepare("SELECT * FROM users WHERE package_id = ? AND role = 'user' ORDER BY username");
+        $members->execute([$pkg['id']]);
+        $members = $members->fetchAll();
+        // Smaller limits: first show which of its accounts already have more.
+        if (($_POST['confirm'] ?? '') !== '1') {
+            $next = array_combine(array_keys(self::LIMITS), $v) + ['features' => $features, 'name' => $name];
+            $rows = [];
+            foreach ($members as $m) {
+                if ($over = AccountService::overages($m, $next)) {
+                    $rows[] = ['account' => $m, 'items' => $over];
+                }
+            }
+            if ($rows) {
+                $hidden = $_POST;
+                unset($hidden['csrf_token'], $hidden['confirm']);
+                View::render('whm/package_change', [
+                    'title' => "Save {$name} with smaller limits?",
+                    'intro' => Ui::plural(count($rows), 'account on it already has', 'accounts on it already have') . ' more than the new limits allow. Nothing is deleted; this is what happens:',
+                    'rows' => $rows,
+                    'action' => "/whm/packages/{$pkg['id']}",
+                    'hidden' => $hidden,
+                    'confirm' => 'Save anyway',
+                    'back' => "/whm/packages/{$pkg['id']}/edit",
+                ], 'whm');
+                return;
+            }
+        }
         Database::app()->prepare(
             'UPDATE packages SET name = ?, disk_quota_mb = ?, bandwidth_mb = ?, max_domains = ?, max_databases = ?, max_email_accounts = ?, max_ftp_accounts = ?, max_accounts = ?, features = ? WHERE id = ?'
-        )->execute([$name, ...$v, Features::fromForm($_POST), $pkg['id']]);
+        )->execute([$name, ...$v, $features, $pkg['id']]);
         // SFTP logins carry the disk quota; the account runtime picks up the rest.
-        $users = Database::app()->prepare("SELECT id FROM users WHERE package_id = ? AND role = 'user'");
-        $users->execute([$pkg['id']]);
         $quotaBytes = Quota::bytes($v[0]);
-        foreach ($users->fetchAll(PDO::FETCH_COLUMN) as $uid) {
+        foreach (array_map(fn($m) => (int) $m['id'], $members) as $uid) {
             $logins = Database::app()->prepare('SELECT username FROM ftp_accounts WHERE user_id = ?');
             $logins->execute([$uid]);
             foreach ($logins->fetchAll(PDO::FETCH_COLUMN) as $login) {
@@ -177,7 +203,8 @@ final class PackageController
                 }
             }
         }
-        Flash::ok("Package \"$name\" saved. Its accounts have the new limits and features (hard disk quotas follow within the hour).");
+        UsageService::applySoon(array_map(fn($m) => (int) $m['id'], $members));
+        Flash::ok("Package \"$name\" saved. Its accounts have the new limits and features now, disk quotas within a minute.");
         header('Location: /whm/packages');
         exit;
     }

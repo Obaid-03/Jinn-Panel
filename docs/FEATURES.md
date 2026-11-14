@@ -169,6 +169,14 @@ or age. All of it is in the address, so a filtered list can be bookmarked.
 done alone (whose it is, the last admin, reseller limits); the result says
 which ones weren't changed and why.
 
+**Moving to a smaller package** - one account, several, or editing a
+package down - first shows each account that already has more than the new
+limits allow: disk, this month's bandwidth, domains, databases, mailboxes,
+SFTP logins and features it would lose, with what happens (nothing is
+deleted). **Move anyway** / **Save anyway** goes ahead. Either way, new
+limits apply at once: the worker measures the affected accounts within a
+minute (hard disk quota, bandwidth pause) instead of at the next hour.
+
 **Create account** - account type (admin only: hosting account, reseller
 or administrator), username, full name, email, password (with a
 generator) and hosting package (administrators have none), and **Send a
@@ -619,7 +627,9 @@ SFTP only (port 2022, SCP works too); there is no plain FTP. Create a login
 (each site appears as `/<domain>`) or restricted to one domain's folder.
 Each login has the package's disk quota in SFTPGo. **SSH keys**: paste
 OpenSSH public keys (one per line, up to 10) to sign in with a key as well
-as the password. Delete with the trash icon.
+as the password. Under the box, the two commands to copy: `ssh-keygen` to
+make a key pair (named for the server and login), and `sftp -i ... -P
+<port>` to connect with it. Delete with the trash icon.
 
 ### DNS Zones
 

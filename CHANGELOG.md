@@ -59,6 +59,12 @@ emails need both).
   open), an **alerts bell** with a count in the top bar, and dashboards that
   refresh every 30 seconds (background refreshes don't keep an idle session
   signed in).
+- **Moving to a smaller package** (one account, several, or a package
+  edited down) first lists what each account already has beyond the new
+  limits and what that means; new limits then apply within a minute (the
+  worker measures those accounts right away) instead of at the next hour.
+- **SFTP keys**: the `ssh-keygen` and `sftp -i` commands to copy, filled in
+  for the login, server and port.
 - Charts are drawn on the server (`Chart::`), readable without JavaScript,
   each with a table view; a new type scale (IBM Plex, bundled) and accent.
 
