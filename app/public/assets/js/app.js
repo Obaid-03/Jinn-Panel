@@ -321,6 +321,26 @@
         var list = $('[data-palette-list]', pal);
         var empty = $('[data-palette-empty]', pal);
         var active = 0, shown = [];
+        // Accounts and domains come from the server (GET /search?q=) as you type.
+        var searchUrl = pal.getAttribute('data-search');
+        var remote = [], remoteFor = '', searchTimer = null, searchSeq = 0;
+        var search = function () {
+            var q = input.value.trim();
+            clearTimeout(searchTimer);
+            if (!searchUrl || q.length < 2) { remote = []; remoteFor = ''; return; }
+            searchTimer = setTimeout(function () {
+                var seq = ++searchSeq;
+                fetch(searchUrl + '?q=' + encodeURIComponent(q), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+                    .then(function (r) { return r.ok ? r.json() : { results: [] }; })
+                    .then(function (data) {
+                        if (seq !== searchSeq) return; // an older answer
+                        remote = Array.isArray(data.results) ? data.results : [];
+                        remoteFor = q;
+                        render();
+                    })
+                    .catch(function () {});
+            }, 180);
+        };
 
         var render = function () {
             var q = input.value.trim().toLowerCase();
@@ -329,6 +349,7 @@
                 var hay = (it.label + ' ' + it.group).toLowerCase();
                 return q.split(/\s+/).every(function (w) { return hay.indexOf(w) !== -1; });
             });
+            if (q && remoteFor.toLowerCase() === q) shown = shown.concat(remote);
             active = Math.min(active, Math.max(0, shown.length - 1));
             list.innerHTML = '';
             shown.forEach(function (it, i) {
@@ -337,8 +358,8 @@
                 li.id = 'jp-pal-' + i;
                 li.setAttribute('aria-selected', i === active ? 'true' : 'false');
                 li.className = 'flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm ' + (i === active ? 'bg-accent-soft text-accent-text' : 'text-fg');
-                var a = doc.createElement('span'); a.textContent = it.label;
-                var g = doc.createElement('span'); g.className = 'text-xs text-subtle'; g.textContent = it.group;
+                var a = doc.createElement('span'); a.className = 'min-w-0 truncate'; a.textContent = it.label;
+                var g = doc.createElement('span'); g.className = 'max-w-[55%] shrink-0 truncate text-xs text-subtle'; g.textContent = it.hint ? it.hint : it.group;
                 li.appendChild(a); li.appendChild(g);
                 li.addEventListener('mousemove', function () { if (active !== i) { active = i; render(); } });
                 li.addEventListener('click', function () { go(it); });
@@ -350,8 +371,8 @@
             if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest' });
         };
         var go = function (it) { pal.close(); location.href = it.href; };
-        var open = function () { input.value = ''; active = 0; render(); pal.showModal(); input.focus(); };
-        input.addEventListener('input', function () { active = 0; render(); });
+        var open = function () { input.value = ''; active = 0; remote = []; remoteFor = ''; render(); pal.showModal(); input.focus(); };
+        input.addEventListener('input', function () { active = 0; render(); search(); });
         input.addEventListener('keydown', function (e) {
             if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, shown.length - 1); render(); }
             else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); render(); }

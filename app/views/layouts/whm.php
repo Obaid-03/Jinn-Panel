@@ -34,5 +34,16 @@ $quickActions = [
     ['href' => '/whm/migrations/create', 'label' => 'Start a cPanel migration', 'icon' => 'transfer'],
 ];
 $roleLabel = Auth::isAdmin() ? 'Administrator' : 'Reseller';
+// The alerts bell (admins): the count the worker remembers every minute (AlertService::remember).
+$bell = '';
+if (Auth::isAdmin()) {
+    $alertSum = AlertService::summary();
+    $alertN = (int) ($alertSum['count'] ?? 0);
+    $alertLabel = $alertN ? Ui::plural($alertN, 'alert') . ' to look at' : 'Alerts: all clear';
+    $bell = '<span data-live="bell"><a href="/whm/alerts" class="btn btn-icon relative" aria-label="' . e($alertLabel) . '" title="' . e($alertLabel) . '">' . icon('bell', 'h-5 w-5')
+        . ($alertN ? '<span class="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none tabular-nums '
+            . (($alertSum['level'] ?? '') === 'danger' ? 'bg-danger text-white' : 'bg-warning-soft text-warning-text ring-1 ring-warning/40') . '" aria-hidden="true">' . ($alertN > 9 ? '9+' : $alertN) . '</span>' : '')
+        . '</a></span>';
+}
 $securityHref = '/whm/security';
 include __DIR__ . '/../partials/shell.php';

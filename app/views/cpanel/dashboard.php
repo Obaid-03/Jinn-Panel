@@ -25,7 +25,7 @@ $toneOf = fn(?array $p) => ($p['days'] ?? null) === 0 ? 'text-danger-text' : (($
         <?php if ($summary === null): ?>
         <section class="panel px-5 py-6 text-[13px] text-muted xl:col-span-2">Visitor numbers aren't available yet.</section>
         <?php else: ?>
-        <section class="panel xl:col-span-2" aria-labelledby="visitors-title" data-chart-region="visitors">
+        <section class="panel xl:col-span-2" aria-labelledby="visitors-title" data-chart-region="visitors" data-live="visitors">
             <div class="flex flex-wrap items-start justify-between gap-x-8 gap-y-3 px-5 pt-5">
                 <div class="min-w-0">
                     <h2 id="visitors-title" class="text-[13px] font-medium text-muted">Visitors to your sites, last <?= e($rangeName) ?></h2>
@@ -49,7 +49,7 @@ $toneOf = fn(?array $p) => ($p['days'] ?? null) === 0 ? 'text-danger-text' : (($
         </section>
         <?php endif; ?>
 
-        <section class="panel" aria-labelledby="plan-title">
+        <section class="panel" aria-labelledby="plan-title" data-live="plan">
             <?= Ui::cardHeader('Your plan', $pkg ? $pkg['name'] . ($measured['updated'] ? ', measured ' . fmt_ago((string) $measured['updated']) : '') : 'No package yet', id: 'plan-title') ?>
             <?php if (!$pkg): ?>
             <p class="card-body text-[13px] text-muted">No package is assigned to this account yet, so nothing can be created. Ask your hosting provider to assign one.</p>

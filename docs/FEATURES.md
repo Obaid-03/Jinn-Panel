@@ -100,6 +100,14 @@ activity log.
 
 ## WHM (admin and reseller)
 
+On every page, the top bar has **search** (Ctrl-K, or `/`): pages and
+actions, and accounts and domains by name as you type (a reseller finds
+only its own accounts; a hosting account only its own domains); for the
+admin, an **alerts bell** with the number of alerts (counted every minute
+by the worker); the theme; and the account menu. Dashboards refresh their
+numbers every 30 seconds while the tab is open; that doesn't stop an idle
+session from signing out.
+
 The sidebar, in order: **Dashboard**, **Analytics**, **Accounts**, **Packages**,
 **cPanel Migration**, **Activity Log**; then, for the admin only, a
 **Server Config** section: **Backups**, **DNS Zones**, **Mail Settings**,

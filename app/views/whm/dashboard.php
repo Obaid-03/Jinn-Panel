@@ -38,6 +38,7 @@ if ($admin && $stats) {
         . '</div>';
 }
 $trafficTitle = $admin ? 'Requests to all sites' : 'Requests to your accounts\' sites';
+$trafficLive = true; // these panels refresh every 30 seconds (charts.js)
 ?>
 <div class="stack">
     <?php include __DIR__ . '/../partials/traffic_panel.php'; ?>
@@ -55,7 +56,7 @@ $trafficTitle = $admin ? 'Requests to all sites' : 'Requests to your accounts\' 
         </section>
 
         <?php if ($admin): ?>
-        <section class="panel" aria-labelledby="services-title">
+        <section class="panel" aria-labelledby="services-title" data-live="services">
             <?= Ui::cardHeader('Services', $uptime && array_sum(array_column($uptime, 'checks')) > 0 ? 'Checked every minute; each block is 30 minutes of the last 24 hours.' : 'Checked by connecting to each one just now.', id: 'services-title') ?>
             <ul class="card-body space-y-4">
                 <?php foreach (($stats['services'] ?? []) as $svc => $status): $u = $uptime[$svc] ?? null; $now = $status === 'active'; ?>
@@ -77,7 +78,7 @@ $trafficTitle = $admin ? 'Requests to all sites' : 'Requests to your accounts\' 
         </section>
         <?php endif; ?>
 
-        <section class="panel" aria-labelledby="limits-title">
+        <section class="panel" aria-labelledby="limits-title" data-live="limits">
             <?= Ui::cardHeader('Nearing their limits', 'At the current rate', '<a href="/whm/accounts?sort=disk" class="btn btn-ghost btn-sm">Accounts</a>', id: 'limits-title') ?>
             <?php if (!$limits): ?>
             <p class="card-body flex items-center gap-2 text-[13px] text-muted"><?= icon('check-circle', 'h-4 w-4 shrink-0 text-success') ?>No account is close to a limit.</p>
@@ -100,7 +101,7 @@ $trafficTitle = $admin ? 'Requests to all sites' : 'Requests to your accounts\' 
 
     <div class="grid grid-cols-1 gap-6 <?= $admin ? 'lg:grid-cols-3' : '' ?>">
         <?php if ($admin): ?>
-        <section class="panel lg:col-span-2" aria-labelledby="attention-title">
+        <section class="panel lg:col-span-2" aria-labelledby="attention-title" data-live="attention">
             <?= Ui::cardHeader('Needs attention', '', '<a href="/whm/alerts" class="btn btn-ghost btn-sm">All alerts</a>', id: 'attention-title') ?>
             <?php if (!$alerts): ?>
             <div class="flex items-center gap-3 px-5 py-4 text-[13.5px]">
@@ -127,7 +128,7 @@ $trafficTitle = $admin ? 'Requests to all sites' : 'Requests to your accounts\' 
         </section>
         <?php endif; ?>
 
-        <section class="panel" aria-labelledby="recent-title">
+        <section class="panel" aria-labelledby="recent-title" data-live="recent">
             <?= Ui::cardHeader('Recent activity', '', '<a href="/whm/activity" class="btn btn-ghost btn-sm">Log</a>', id: 'recent-title') ?>
             <?php if (!$recent): ?>
             <?= Ui::empty('Nothing yet', 'Sign-ins and every change made in the panel show up here.', 'activity') ?>

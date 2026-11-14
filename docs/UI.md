@@ -183,7 +183,8 @@ drawing an empty frame.
 ## Page structure
 
 The layout (`views/partials/shell.php`) draws the sidebar, top bar
-(Ctrl-K search, theme, account menu), the page title from `$title` with
+(Ctrl-K search - pages and actions, plus accounts and domains from
+`GET /search` - the alerts bell for admins, theme, account menu), the page title from `$title` with
 breadcrumbs above it when they lead to a parent page, toasts for flash
 messages and the confirm dialog. A view only
 renders the page body, and can hand the layout:
@@ -215,6 +216,8 @@ All behaviour hangs off data attributes, so views have no inline scripts:
 | `input[data-filter="#table"]` | filter table rows while typing; a row with `data-filter-none` shows when nothing matches |
 | `[data-countup]` | number counts up once |
 | `button[data-dialog-open="<dialog id>"]`, `[data-dialog-close]`, `[data-dialog-focus]` | open/close a page's own `<dialog class="dialog">` and focus a field in it |
+| `[data-chart-region="name"]` | range links (`Chart::ranges`) inside reload only this region (`pages/charts.js`) |
+| `[data-live="name"]` | on a page with charts: reloads itself every 30 seconds while the tab is visible and nobody is using it; the request carries `X-JP-Live`, which doesn't count as activity for the idle sign-out |
 
 Page-specific code goes in `public/assets/js/pages/<name>.js`, loaded with
 `View::script('<name>')`. Pass values to it through `data-` attributes or a

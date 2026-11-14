@@ -55,6 +55,10 @@ emails need both).
 - **Accounts list**: search, filters with counts, sorting and pages in the
   database (fast with thousands of accounts), a 14-day requests trend per
   account.
+- **Ctrl-K finds accounts and domains** by name (scoped to what the user may
+  open), an **alerts bell** with a count in the top bar, and dashboards that
+  refresh every 30 seconds (background refreshes don't keep an idle session
+  signed in).
 - Charts are drawn on the server (`Chart::`), readable without JavaScript,
   each with a table view; a new type scale (IBM Plex, bundled) and accent.
 

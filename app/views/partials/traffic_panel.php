@@ -7,9 +7,11 @@
  * $trafficTitle  e.g. 'Requests to all sites'
  * $trafficFoot   optional HTML under the chart (a row of figures)
  * $trafficRegion false when a larger region around it should reload instead
+ * $trafficLive   true to refresh it every 30 seconds (dashboards)
  */
 $trafficFoot ??= '';
 $trafficRegion ??= true;
+$trafficLive ??= false;
 if ($traffic === null): ?>
 <section class="panel px-5 py-6 text-[13px] text-muted">Statistics aren't available yet: the database needs the update's migration (026).</section>
 <?php return; endif;
@@ -18,7 +20,7 @@ $fmt = $traffic['metric'] === 'bytes' ? 'bytes' : 'compact';
 $change = StatsService::change((float) $traffic['total'], (float) $traffic['previous'], $rangeName);
 $noun = ['requests' => 'Requests', 'visitors' => 'Visitors', 'bytes' => 'Data sent'][$traffic['metric']];
 ?>
-<section class="panel" aria-labelledby="traffic-title"<?= $trafficRegion ? ' data-chart-region="traffic"' : '' ?>>
+<section class="panel" aria-labelledby="traffic-title"<?= $trafficRegion ? ' data-chart-region="traffic"' : '' ?><?= $trafficLive ? ' data-live="traffic"' : '' ?>>
     <div class="flex flex-wrap items-start justify-between gap-x-8 gap-y-3 px-5 pt-5">
         <div class="min-w-0">
             <h2 id="traffic-title" class="text-[13px] font-medium text-muted"><?= e($trafficTitle) ?>, last <?= e($rangeName) ?></h2>

@@ -36,6 +36,9 @@ foreach (['/whm/security', '/cpanel/security'] as $sec) {
     $router->post("$sec/2fa/recovery", ['SecurityController', 'recoveryCodes']);
 }
 
+// Ctrl-K: accounts and domains by name (any signed-in user, scoped to what they may open)
+$router->get('/search', ['SearchController', 'index']);
+
 // WHM (admin + reseller)
 $router->get('/whm', ['WhmDashboardController', 'index']);
 $router->get('/whm/analytics', ['WhmDashboardController', 'analytics']);

@@ -48,6 +48,22 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     return true;
 }
 
+// Ctrl-K search (SearchController) with sample accounts and domains.
+if ($uri === '/search') {
+    $q = strtolower(trim((string) ($_GET['q'] ?? '')));
+    $all = [
+        ['label' => 'acme', 'hint' => 'Hosting account · Acme Ltd', 'href' => '/whm/accounts/10', 'group' => 'Accounts'],
+        ['label' => 'bakery', 'hint' => 'Hosting account, suspended · The Bakery', 'href' => '/whm/accounts/10', 'group' => 'Accounts'],
+        ['label' => 'resell', 'hint' => 'Reseller · North Web Reselling', 'href' => '/whm/accounts/10', 'group' => 'Accounts'],
+        ['label' => 'acme.test', 'hint' => 'Site of acme', 'href' => '/whm/accounts/10', 'group' => 'Domains'],
+        ['label' => 'shop.acme.test', 'hint' => 'Site of acme', 'href' => '/whm/accounts/10', 'group' => 'Domains'],
+        ['label' => 'bakery.test', 'hint' => 'Site of bakery', 'href' => '/whm/accounts/10', 'group' => 'Domains'],
+    ];
+    header('Content-Type: application/json');
+    echo json_encode(['results' => strlen($q) < 2 ? [] : array_values(array_filter($all, fn($r) => str_contains($r['label'] . ' ' . strtolower($r['hint']), $q)))]);
+    return true;
+}
+
 // A page at phone width (headless Chrome can't make a window under 500px).
 if ($uri === '/__frame') {
     $w = max(320, min(1600, (int) ($_GET['w'] ?? 390)));

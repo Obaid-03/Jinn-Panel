@@ -204,10 +204,10 @@ $impersonator = $_SESSION['impersonator'] ?? null;
     </form>
 </dialog>
 
-<dialog id="jp-palette" class="dialog max-w-lg self-start sm:mt-[12vh]" aria-label="Go to">
+<dialog id="jp-palette" class="dialog max-w-lg self-start sm:mt-[12vh]" aria-label="Go to" data-search="/search">
     <div class="flex items-center gap-3 border-b border-line px-4">
         <?= icon('search', 'h-4 w-4 text-subtle') ?>
-        <input type="text" class="w-full bg-transparent py-3.5 text-sm text-fg placeholder:text-subtle focus:outline-none" placeholder="Go to a page or action…" aria-label="Search pages and actions" data-palette-input autocomplete="off" role="combobox" aria-expanded="true" aria-controls="jp-palette-list">
+        <input type="text" class="w-full bg-transparent py-3.5 text-sm text-fg placeholder:text-subtle focus:outline-none" placeholder="<?= ($me['role'] ?? '') === 'user' ? 'Go to a page or domain…' : 'Go to a page, account or domain…' ?>" aria-label="Search pages, accounts and domains" data-palette-input autocomplete="off" role="combobox" aria-expanded="true" aria-controls="jp-palette-list">
         <kbd class="kbd">Esc</kbd>
     </div>
     <ul id="jp-palette-list" class="max-h-80 overflow-y-auto p-2" role="listbox" data-palette-list></ul>

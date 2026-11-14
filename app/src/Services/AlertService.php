@@ -107,6 +107,34 @@ final class AlertService
     }
 
     /** @template T @param callable():T $fn @param T $default @return T */
+    /**
+     * How many alerts there are and the worst level, kept in panel_settings
+     * for the top bar's bell (refreshed by the worker every minute and by
+     * every page that collects alerts), so pages don't check services.
+     *
+     * @param list<array<string,mixed>>|null $alerts collect()'s result, if at hand
+     * @return array{count:int, level:string, at:int}
+     */
+    public static function remember(?array $alerts = null): array
+    {
+        $alerts ??= self::collect();
+        $levels = array_column($alerts, 'level');
+        $summary = [
+            'count' => count($alerts),
+            'level' => in_array('danger', $levels, true) ? 'danger' : (in_array('warning', $levels, true) ? 'warning' : ($alerts ? 'info' : '')),
+            'at' => time(),
+        ];
+        self::safely(fn() => Settings::set('alerts_summary', (string) json_encode($summary)), null);
+        return $summary;
+    }
+
+    /** The last remembered summary, or null before the first one. @return array{count:int, level:string, at:int}|null */
+    public static function summary(): ?array
+    {
+        $s = json_decode(Settings::get('alerts_summary'), true);
+        return is_array($s) && isset($s['count']) ? $s : null;
+    }
+
     private static function safely(callable $fn, mixed $default): mixed
     {
         try {

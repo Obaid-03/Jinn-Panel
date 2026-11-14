@@ -8,9 +8,11 @@ final class AlertController
     {
         Auth::requireRole(['admin']);
         $health = SystemWorkerService::output('health.txt');
+        $alerts = AlertService::collect();
+        AlertService::remember($alerts);
         View::render('whm/alerts', [
             'title' => 'Alerts',
-            'alerts' => AlertService::collect(),
+            'alerts' => $alerts,
             'healthLine' => $health !== null ? strtok($health, "\n") : null,
             'emails' => NotificationService::settings()['alerts'],
         ], 'whm');

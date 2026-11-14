@@ -7,6 +7,7 @@
 // Range links (Chart::ranges) inside a [data-chart-region="name"] swap only
 // that region: the page is fetched at the link's URL and the region with the
 // same name replaces this one. Without JavaScript they are plain links.
+// [data-live] regions refresh themselves every 30 seconds (see the end).
 (function () {
     'use strict';
 
@@ -163,6 +164,37 @@
         e.preventDefault();
         swap(region, a.href, { push: true }).catch(function () { location.href = a.href; });
     });
+
+    // Dashboards: every [data-live="name"] region reloads from the same URL
+    // every 30 seconds while the tab is visible and nobody is using it. The
+    // request says X-JP-Live, so it doesn't keep an idle session signed in.
+    var live = document.querySelectorAll('[data-live]');
+    if (live.length) {
+        var timer = setInterval(function () {
+            if (document.hidden) return;
+            var regions = document.querySelectorAll('[data-live]');
+            var busy = Array.prototype.some.call(regions, function (r) {
+                return r.contains(document.activeElement) || r.hasAttribute('aria-busy') || r.querySelector('.chart-tip:not([hidden]), details[open]');
+            });
+            if (busy) return;
+            fetch(location.href, { headers: { 'X-JP-Poll': '1', 'X-JP-Live': '1' }, credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) {
+                    if (!r.ok || r.redirected) throw new Error('HTTP ' + r.status);
+                    return r.text();
+                })
+                .then(function (html) {
+                    var doc = new DOMParser().parseFromString(html, 'text/html');
+                    document.querySelectorAll('[data-live]').forEach(function (region) {
+                        var fresh = doc.querySelector('[data-live="' + region.getAttribute('data-live') + '"]');
+                        if (fresh && fresh.innerHTML !== region.innerHTML) {
+                            region.innerHTML = fresh.innerHTML;
+                            initAll(region);
+                        }
+                    });
+                })
+                .catch(function () { clearInterval(timer); }); // signed out or offline: stop
+        }, 30000);
+    }
 
     window.JPCharts = { init: initAll, swap: swap };
     initAll(document);

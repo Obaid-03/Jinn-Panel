@@ -49,12 +49,20 @@ final class WhmDashboardController
             'suspendedCount' => self::suspendedCount($user),
             'alloc' => $admin ? null : ResellerService::allocation((int) $user['id']),
             'stats' => $admin ? ServerStatus::stats() : null,
-            'alerts' => $admin ? AlertService::collect() : [],
+            'alerts' => $admin ? self::alerts() : [],
             'recent' => $recent->fetchAll(),
             'logServices' => $admin ? self::logServices() : [],
             'selectedLog' => (string) ($_GET['log'] ?? 'frankenphp'),
             'logContent' => $admin ? self::readLog((string) ($_GET['log'] ?? 'frankenphp')) : null,
         ], 'whm');
+    }
+
+    /** @return list<array<string,mixed>> */
+    private static function alerts(): array
+    {
+        $alerts = AlertService::collect();
+        AlertService::remember($alerts);
+        return $alerts;
     }
 
     /** Statistics are extra: without their tables (an update not yet migrated) the page still works. */

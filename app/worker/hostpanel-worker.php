@@ -1862,6 +1862,7 @@ function statsDue(): void
             touch(OUT_DIR . '/.periodic-minute');
             panelClasses();
             StatsCollector::sample($log);
+            AlertService::remember(); // the count on the top bar's bell
         }
         if ($due('5min', 295)) {
             panelClasses();
