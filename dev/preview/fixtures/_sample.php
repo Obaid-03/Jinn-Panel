@@ -36,7 +36,8 @@ function sample_packages(): array
 {
     return [
         sample_pkg() + ['owner_username' => null, 'account_count' => 6],
-        ['id' => 2, 'owner_id' => null, 'name' => 'Starter', 'disk_quota_mb' => 1024, 'bandwidth_mb' => 10240, 'max_domains' => 1, 'max_databases' => 1, 'max_email_accounts' => 5, 'max_ftp_accounts' => 1, 'max_accounts' => 0, 'owner_username' => null, 'account_count' => 0],
+        ['id' => 2, 'owner_id' => null, 'name' => 'Starter', 'disk_quota_mb' => 1024, 'bandwidth_mb' => 10240, 'max_domains' => 1, 'max_databases' => 1, 'max_email_accounts' => 5, 'max_ftp_accounts' => 1, 'max_accounts' => 0, 'owner_username' => null, 'account_count' => 0,
+            'features' => '{"file_manager":true,"cron":false,"backups":true,"dns_editor":true,"php_versions":false,"aliases":false,"routes":false,"object_cache":false,"database_access":true,"ssh_keys":true}'],
         ['id' => 3, 'owner_id' => null, 'name' => 'Reseller 50', 'disk_quota_mb' => 51200, 'bandwidth_mb' => 512000, 'max_domains' => 50, 'max_databases' => 50, 'max_email_accounts' => 200, 'max_ftp_accounts' => 20, 'max_accounts' => 50, 'owner_username' => null, 'account_count' => 1],
         ['id' => 4, 'owner_id' => 2, 'name' => 'Agency Pro', 'disk_quota_mb' => 20480, 'bandwidth_mb' => 204800, 'max_domains' => 10, 'max_databases' => 20, 'max_email_accounts' => 50, 'max_ftp_accounts' => 5, 'max_accounts' => 0, 'owner_username' => 'resell', 'account_count' => 2],
     ];

@@ -7,6 +7,7 @@ $name = trim((string) ($me['full_name'] ?? '')) ?: (string) $me['username'];
 View::slot('desc', e('Welcome back, ' . $name . '. Here is your hosting at a glance.'));
 View::slot('actions', '<a href="/cpanel/domains#add-domain" class="btn btn-primary">' . icon('plus') . 'Add domain</a>');
 $sslTone = fn(string $st) => $st === 'ok' ? 'success' : ($st === 'no_dns' ? 'danger' : 'warning');
+$can = Features::current();
 $tiles = [
     ['/cpanel/email', 'mail', 'Email accounts', Ui::plural((int) $usage['email_accounts'], 'mailbox', 'mailboxes')],
     ['/cpanel/databases', 'database', 'MySQL databases', Ui::plural((int) $usage['databases'], 'database')],
@@ -17,6 +18,8 @@ $tiles = [
     ['/cpanel/cache', 'bolt', 'Cache', 'Page and object cache'],
     ['/cpanel/backups', 'archive', 'Backups', 'Download and restore'],
 ];
+$tileFeature = ['/cpanel/files' => 'file_manager', '/cpanel/cron' => 'cron', '/cpanel/backups' => 'backups'];
+$tiles = array_values(array_filter($tiles, fn($t) => !isset($tileFeature[$t[0]]) || $can[$tileFeature[$t[0]]]));
 ?>
 <div class="stack">
     <?php include __DIR__ . '/../partials/quota_bars.php'; ?>

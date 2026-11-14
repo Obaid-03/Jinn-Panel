@@ -19,8 +19,9 @@ $st = $ssl['state'];
 $sslTone = $st === 'ok' ? 'success' : ($st === 'no_dns' ? 'danger' : 'warning');
 $pointsHere = in_array(Config::SERVER_IP, $addresses, true) || (Config::SERVER_IPV6 !== '' && in_array(Config::SERVER_IPV6, $addresses, true));
 $sslChoice = $d['ssl_mode'] === 'letsencrypt' ? 'letsencrypt' : ((int) $d['ssl_pinned'] === 1 ? 'self_signed' : 'auto');
+$can = Features::current();
 $phpOptions = ['default' => 'Default (PHP 8.5)'];
-foreach ($phpVersions ?? [] as $v) {
+foreach ($can['php_versions'] ? ($phpVersions ?? []) : [] as $v) {
     $phpOptions[$v] = 'PHP ' . $v;
 }
 if (!isset($phpOptions[$d['php_version']])) {
@@ -65,7 +66,7 @@ if (!isset($phpOptions[$d['php_version']])) {
             <input type="hidden" name="back" value="domain">
             <?= Ui::cardHeader('PHP version and certificate') ?>
             <div class="card-body space-y-4">
-                <?= Ui::select('php_version', 'PHP version', $phpOptions, (string) $d['php_version'], ['hint' => 'The site switches within a few seconds. Check it afterwards: older code may not run on newer PHP.']) ?>
+                <?= Ui::select('php_version', 'PHP version', $phpOptions, (string) $d['php_version'], ['hint' => $can['php_versions'] ? 'The site switches within a few seconds. Check it afterwards: older code may not run on newer PHP.' : 'Your package runs sites on the default PHP version.']) ?>
                 <?= Ui::select('ssl_mode', 'Certificate', [
                     'auto' => 'Automatic (recommended)',
                     'letsencrypt' => 'Let\'s Encrypt only',
@@ -122,11 +123,15 @@ if (!isset($phpOptions[$d['php_version']])) {
                 <?php else: ?>
                 <p class="text-sm text-muted">No aliases.</p>
                 <?php endif; ?>
+                <?php if ($can['aliases']): ?>
                 <form method="post" action="/cpanel/domains/<?= $id ?>/aliases" class="flex items-end gap-2">
                     <?= Csrf::field() ?>
                     <?= Ui::field('alias', 'Add an alias', ['required' => true, 'placeholder' => 'example.net', 'wrap' => 'flex-1', 'attrs' => ['autocapitalize' => 'off', 'spellcheck' => 'false']]) ?>
                     <button class="btn btn-secondary"><?= icon('plus') ?>Add</button>
                 </form>
+                <?php else: ?>
+                <p class="flex items-center gap-2 text-sm text-muted"><?= icon('lock', 'h-4 w-4') ?>Adding aliases isn't in your package.</p>
+                <?php endif; ?>
             </div>
         </section>
 

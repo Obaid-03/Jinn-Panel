@@ -30,6 +30,20 @@ component classes, the `Ui::` helpers, and how a view hands actions,
 breadcrumbs and scripts to the layout. A new view needs a fixture in
 `dev/preview/fixtures/` (CI fails without one).
 
+**The real panel on your machine** (sign-in, WHM, accounts, packages,
+features; no mail/DNS/SFTP/PHP pools) runs against a local MySQL 5.7+ or
+MariaDB - MAMP's by default:
+
+```bash
+dev/local/setup.sh      # creates jinnpanel_local, applies the schema, writes a local Config.php, seeds demo logins
+dev/local/serve.sh      # http://127.0.0.1:8088 (Chrome or Firefox)
+```
+
+Pages that talk to an account's PHP pool (File Manager, Cache) wait about
+15 seconds per domain for pools that don't exist locally, then show an
+error; mail, DNS and SFTP actions fail with an error. `FORCE=1
+dev/local/setup.sh` starts over.
+
 **Everything else** (provisioning, the worker, mail, DNS) is built against
 a real running stack (FrankenPHP, MariaDB, Stalwart, SFTPGo, Knot):
 

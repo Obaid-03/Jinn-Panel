@@ -50,8 +50,8 @@ final class PackageController
         }
         $v = self::limits($user);
         Database::app()->prepare(
-            'UPDATE packages SET name = ?, disk_quota_mb = ?, bandwidth_mb = ?, max_domains = ?, max_databases = ?, max_email_accounts = ?, max_ftp_accounts = ?, max_accounts = ? WHERE id = ?'
-        )->execute([$name, ...$v, $pkg['id']]);
+            'UPDATE packages SET name = ?, disk_quota_mb = ?, bandwidth_mb = ?, max_domains = ?, max_databases = ?, max_email_accounts = ?, max_ftp_accounts = ?, max_accounts = ?, features = ? WHERE id = ?'
+        )->execute([$name, ...$v, Features::fromForm($_POST), $pkg['id']]);
         // SFTP logins carry the disk quota; the account runtime picks up the rest.
         $users = Database::app()->prepare("SELECT id FROM users WHERE package_id = ? AND role = 'user'");
         $users->execute([$pkg['id']]);
@@ -67,7 +67,7 @@ final class PackageController
                 }
             }
         }
-        Flash::ok("Package \"$name\" saved. Its accounts have the new limits (hard disk quotas follow within the hour).");
+        Flash::ok("Package \"$name\" saved. Its accounts have the new limits and features (hard disk quotas follow within the hour).");
         header('Location: /whm/packages');
         exit;
     }
@@ -116,10 +116,10 @@ final class PackageController
         }
 
         $stmt = Database::app()->prepare(
-            'INSERT INTO packages (owner_id, name, disk_quota_mb, bandwidth_mb, max_domains, max_databases, max_email_accounts, max_ftp_accounts, max_accounts)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO packages (owner_id, name, disk_quota_mb, bandwidth_mb, max_domains, max_databases, max_email_accounts, max_ftp_accounts, max_accounts, features)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$user['role'] === 'admin' ? null : $user['id'], $name, ...self::limits($user)]);
+        $stmt->execute([$user['role'] === 'admin' ? null : $user['id'], $name, ...self::limits($user), Features::fromForm($_POST)]);
 
         Flash::ok("Package \"$name\" created.");
         header('Location: /whm/packages');

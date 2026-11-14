@@ -197,6 +197,41 @@ final class AccountService
         AccountRuntime::sync($userId);
     }
 
+    /**
+     * Moves an account to another package (the account page's quick
+     * switch). Returns an error, or null.
+     */
+    public static function changePackage(array $target, int $packageId, array $me): ?string
+    {
+        if ($target['role'] === 'admin') {
+            return 'Administrators don\'t have a package.';
+        }
+        if ($target['role'] === 'user' && $packageId <= 0) {
+            return 'A hosting account needs a package.';
+        }
+        if ($packageId > 0 && $packageId !== (int) $target['package_id']
+            && !in_array($packageId, array_map('intval', array_column(self::availablePackages($me), 'id')), true)) {
+            return 'Invalid package selected.';
+        }
+        Database::app()->prepare('UPDATE users SET package_id = ? WHERE id = ?')->execute([$packageId ?: null, $target['id']]);
+        if ($target['role'] === 'user' && $packageId !== (int) $target['package_id']) {
+            self::applyPackage((int) $target['id']);
+        }
+        Features::forget();
+        return null;
+    }
+
+    /**
+     * An account's own feature switches on top of its package
+     * (override[feature] = '' package | '1' on | '0' off).
+     */
+    public static function setFeatureOverrides(array $target, array $post): void
+    {
+        Database::app()->prepare('UPDATE users SET feature_overrides = ? WHERE id = ?')
+            ->execute([Features::overridesFromForm($post), $target['id']]);
+        Features::forget();
+    }
+
     /** Whether removing/suspending $target would leave no active admin. */
     public static function isLastAdmin(array $target): bool
     {

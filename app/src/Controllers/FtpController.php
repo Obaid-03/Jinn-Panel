@@ -122,6 +122,11 @@ final class FtpController
             }
             $keys[] = $line;
         }
+        if ($keys && !Features::has('ssh_keys')) {
+            Flash::error('Your package doesn\'t include SSH keys for SFTP. Ask your hosting provider if you need them.');
+            header('Location: /cpanel/ftp');
+            exit;
+        }
         if (count($keys) > 10) {
             Flash::error('At most 10 keys per login.');
             header('Location: /cpanel/ftp');

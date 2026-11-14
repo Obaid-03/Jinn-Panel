@@ -17,6 +17,13 @@ $nav = [
         ['href' => '/cpanel/backups', 'label' => 'Backups', 'icon' => 'archive'],
     ]],
 ];
+// Tools the account's package doesn't include aren't listed (Features).
+$can = Features::current();
+$gated = ['/cpanel/files' => 'file_manager', '/cpanel/cron' => 'cron', '/cpanel/backups' => 'backups'];
+foreach ($nav as &$group) {
+    $group['items'] = array_values(array_filter($group['items'], fn($i) => !isset($gated[$i['href']]) || $can[$gated[$i['href']]]));
+}
+unset($group);
 $quickActions = [
     ['href' => '/cpanel/domains#add-domain', 'label' => 'Add a domain', 'icon' => 'plus'],
     ['href' => '/cpanel/email#add-mailbox', 'label' => 'Create a mailbox', 'icon' => 'mail'],

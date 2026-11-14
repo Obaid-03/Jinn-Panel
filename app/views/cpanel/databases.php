@@ -8,9 +8,10 @@
 /** @var string $serverHost */
 /** @var string|null $loadError */
 View::slot('desc', e('Databases for your sites, and the MySQL users they sign in with.'));
+$dbAccess = Features::has('database_access');
 View::slot('actions',
-    '<form method="post" action="/cpanel/databases/phpmyadmin" target="_blank">' . Csrf::field()
-    . '<button type="submit" class="btn btn-secondary"' . ($dbs ? ' title="Opens in a new tab, signed in"' : ' disabled title="Create a database first"') . '>' . icon('external') . 'phpMyAdmin</button></form>'
+    ($dbAccess ? '<form method="post" action="/cpanel/databases/phpmyadmin" target="_blank">' . Csrf::field()
+    . '<button type="submit" class="btn btn-secondary"' . ($dbs ? ' title="Opens in a new tab, signed in"' : ' disabled title="Create a database first"') . '>' . icon('external') . 'phpMyAdmin</button></form>' : '')
     . '<a href="#add-database" class="btn btn-primary">' . icon('plus') . 'Create database</a>');
 View::script('databases');
 
@@ -228,6 +229,9 @@ $dbFull = $pkg && (int) $usage['databases'] >= (int) $pkg['max_databases'];
                 <?php else: ?>
                 <p class="px-5 py-4 text-sm text-muted">None: only your sites on this server can connect.</p>
                 <?php endif; ?>
+                <?php if (!$dbAccess): ?>
+                <p class="flex items-center gap-2 rounded-b-xl border-t border-line bg-surface-2 px-5 py-4 text-sm text-muted"><?= icon('lock', 'h-4 w-4') ?>Remote MySQL access isn't in your package.</p>
+                <?php else: ?>
                 <form method="post" action="/cpanel/databases/remote" class="flex flex-col gap-3 rounded-b-xl border-t border-line bg-surface-2 px-5 py-4 sm:flex-row sm:items-start">
                     <?= Csrf::field() ?><input type="hidden" name="op" value="add">
                     <?= Ui::field('host', 'Allow connections from', [
@@ -237,6 +241,7 @@ $dbFull = $pkg && (int) $usage['databases'] >= (int) $pkg['max_databases'];
                     ]) ?>
                     <button type="submit" class="btn btn-secondary shrink-0 sm:mt-[1.625rem]"><?= icon('plus') ?>Add host</button>
                 </form>
+                <?php endif; ?>
             </section>
         </div>
 

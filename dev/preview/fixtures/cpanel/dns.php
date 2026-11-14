@@ -31,6 +31,7 @@ return [
         'preview' => sample_dns_zone_file($zone, sample_dns_ns(), $records),
     ],
     'variants' => [
+        'read-only' => ['features' => ['file_manager' => false, 'cron' => false, 'backups' => false, 'dns_editor' => false, 'php_versions' => false, 'aliases' => false, 'routes' => false, 'object_cache' => false, 'database_access' => false, 'ssh_keys' => false]],
         // Only the NS records: nothing of the customer's own yet.
         'no-records' => ['records' => [], 'preview' => sample_dns_zone_file($zone, sample_dns_ns(), [])],
         // A domain whose zone isn't on this server (yet).

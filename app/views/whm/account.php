@@ -3,6 +3,9 @@
 /** @var array<string,mixed> $me */
 /** @var array<string,mixed> $o AccountService::overview() */
 /** @var bool $lastAdmin */
+/** @var list<array<string,mixed>> $packages packages the viewer may give it */
+/** @var array<string,bool> $pkgFeatures its package's features */
+/** @var array<string,bool> $overrides its own feature switches */
 $id = (int) $a['id'];
 $user = $a['role'] === 'user';
 $pkg = $o['package'];
@@ -52,6 +55,58 @@ $roleLabel = ['admin' => 'Administrator', 'reseller' => 'Reseller', 'user' => 'H
                 <?= Ui::alert('This account has no package, so it can\'t create anything. Edit it to assign one.', 'warning') ?>
                 <?php endif; ?>
             </div>
+        </section>
+
+        <section class="card scroll-mt-20" id="features" aria-labelledby="features-title">
+            <?= Ui::cardHeader('Package and features', 'Limits come from the package. Each feature follows the package unless it is switched for this account.', '', id: 'features-title') ?>
+            <form method="post" action="/whm/accounts/<?= $id ?>/package" class="flex flex-wrap items-end gap-3 border-b border-line px-5 py-4">
+                <?= Csrf::field() ?>
+                <?php
+                $pkgOptions = [];
+                foreach ($packages as $p) {
+                    $pkgOptions[(string) $p['id']] = $p['name'];
+                }
+                if ($pkg && !isset($pkgOptions[(string) $pkg['id']])) {
+                    $pkgOptions[(string) $pkg['id']] = $pkg['name'];
+                }
+                if (!$pkg) {
+                    $pkgOptions = ['' => 'Choose a package…'] + $pkgOptions;
+                }
+                echo Ui::select('package_id', 'Package', $pkgOptions, $pkg ? (string) $pkg['id'] : '', ['wrap' => 'min-w-[14rem] flex-1']);
+                ?>
+                <button class="btn btn-secondary"><?= icon('box') ?>Change package</button>
+            </form>
+            <form method="post" action="/whm/accounts/<?= $id ?>/features">
+                <?= Csrf::field() ?>
+                <div class="table-wrap">
+                    <table class="table table-tight">
+                        <thead><tr><th scope="col">Feature</th><th scope="col" class="hidden sm:table-cell">Package</th><th scope="col" class="w-40">This account</th></tr></thead>
+                        <tbody>
+                        <?php foreach (Features::LIST as $key => [$label, $what]):
+                            $fromPkg = $pkgFeatures[$key];
+                            $ov = array_key_exists($key, $overrides) ? ($overrides[$key] ? '1' : '0') : '';
+                            $effective = $ov === '' ? $fromPkg : $ov === '1'; ?>
+                        <tr>
+                            <td>
+                                <p class="font-medium text-fg"><?= e($label) ?> <?= $effective ? '' : Ui::badge('Off', 'neutral') ?></p>
+                                <p class="hidden text-xs text-muted md:block"><?= e($what) ?></p>
+                            </td>
+                            <td class="hidden sm:table-cell"><?= $fromPkg ? Ui::badge('Included', 'success', true) : Ui::badge('Not included', 'neutral') ?></td>
+                            <td>
+                                <label for="ov-<?= e($key) ?>" class="sr-only"><?= e($label) ?> for this account</label>
+                                <select id="ov-<?= e($key) ?>" name="override[<?= e($key) ?>]" class="select select-sm">
+                                    <option value="" <?= $ov === '' ? 'selected' : '' ?>>Package (<?= $fromPkg ? 'on' : 'off' ?>)</option>
+                                    <option value="1" <?= $ov === '1' ? 'selected' : '' ?>>On</option>
+                                    <option value="0" <?= $ov === '0' ? 'selected' : '' ?>>Off</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer"><button class="btn btn-primary"><?= icon('save') ?>Save features</button></div>
+            </form>
         </section>
 
         <section class="card" aria-labelledby="domains-title">
@@ -114,6 +169,23 @@ $roleLabel = ['admin' => 'Administrator', 'reseller' => 'Reseller', 'user' => 'H
                 <div><dt>Created</dt><dd><?= e(date('j M Y', (int) strtotime((string) $a['created_at']))) ?></dd></div>
             </dl>
         </section>
+
+        <?php if ($a['role'] === 'reseller'): ?>
+        <form method="post" action="/whm/accounts/<?= $id ?>/package" class="card">
+            <?= Csrf::field() ?>
+            <?= Ui::cardHeader('Package', 'Sets how many hosting accounts this reseller may create.') ?>
+            <div class="card-body">
+                <?php
+                $rOptions = ['' => 'No package'];
+                foreach ($packages as $p) {
+                    $rOptions[(string) $p['id']] = $p['name'] . ((int) ($p['max_accounts'] ?? 0) > 0 ? ' — ' . (int) $p['max_accounts'] . ' accounts' : '');
+                }
+                echo Ui::select('package_id', 'Package', $rOptions, (string) ($a['package_id'] ?? ''), ['label_hidden' => true]);
+                ?>
+            </div>
+            <div class="card-footer"><button class="btn btn-secondary"><?= icon('save') ?>Save</button></div>
+        </form>
+        <?php endif; ?>
 
         <section class="card" aria-labelledby="manage-title">
             <?= Ui::cardHeader('Manage', id: 'manage-title') ?>

@@ -24,6 +24,7 @@ return [
         'loadError' => null,
     ],
     'variants' => [
+        'limited-package' => ['features' => ['file_manager' => false, 'cron' => false, 'backups' => false, 'dns_editor' => false, 'php_versions' => false, 'aliases' => false, 'routes' => false, 'object_cache' => false, 'database_access' => false, 'ssh_keys' => false]],
         'empty' => ['dbs' => [], 'users' => [], 'grants' => [], 'remote' => [], 'usage' => ['domains' => 3, 'databases' => 0, 'email_accounts' => 7, 'ftp_accounts' => 1]],
         'users-only' => ['dbs' => [], 'grants' => [], 'remote' => []],
         'load-error' => ['grants' => [], 'loadError' => 'SQLSTATE[HY000] [2002] Connection refused'],

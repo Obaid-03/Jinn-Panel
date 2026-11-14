@@ -321,6 +321,12 @@ replaces a tag's set, and a customer record with the same name wins.
   failed backups/migrations, expiring certificates, routes to review) for
   WHM > Alerts and the dashboard; the worker's hourly `alertsDue()` copies
   `/var/lib/jinnpanel/health.txt` to OUT_DIR and emails new problems.
+- Package features (`Features`, migration 024): `packages.features` and
+  `users.feature_overrides` (JSON, NULL = everything on). Controllers call
+  `Features::require('cron')` etc.; views use `Features::has()` /
+  `Features::current()`; `CronService::execute` skips accounts without
+  cron. New gated tool: add it to `Features::LIST`, gate its controller,
+  hide it in the views.
 - File editor: pool agent ops `edit_read` / `edit_write` (UTF-8 text up to
   1 MB, atomic rename, keeps permissions, refuses if the file changed since
   it was opened). SFTP logins take SSH public keys (`ftp_accounts.public_keys`

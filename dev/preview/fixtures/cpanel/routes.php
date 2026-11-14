@@ -102,6 +102,7 @@ return [
         'pending' => false,
     ],
     'variants' => [
+        'limited-package' => ['features' => ['file_manager' => false, 'cron' => false, 'backups' => false, 'dns_editor' => false, 'php_versions' => false, 'aliases' => false, 'routes' => false, 'object_cache' => false, 'database_access' => false, 'ssh_keys' => false]],
         'applying' => ['pending' => true],
         'needs-review' => [
             'd' => array_replace($d, ['routes_review' => 1, 'routes_sync_note' => '.htaccess changed, but some of it can\'t be translated exactly - the rules in use were kept. Review the translation below and use it if it is right.']),

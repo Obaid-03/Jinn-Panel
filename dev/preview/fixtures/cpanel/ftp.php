@@ -10,5 +10,5 @@ return [
         ],
         'domains' => sample_domains(), 'usage' => sample_usage(), 'pkg' => sample_pkg(),
     ],
-    'variants' => ['empty' => ['accounts' => []]],
+    'variants' => ['limited-package' => ['features' => ['file_manager' => false, 'cron' => false, 'backups' => false, 'dns_editor' => false, 'php_versions' => false, 'aliases' => false, 'routes' => false, 'object_cache' => false, 'database_access' => false, 'ssh_keys' => false]], 'empty' => ['accounts' => []]],
 ];

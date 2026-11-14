@@ -6,10 +6,12 @@
 /** @var list<array<string,mixed>> $nsRecords */
 /** @var list<string> $types */
 /** @var string|null $preview */
+/** @var bool $canEdit the package includes the DNS editor */
+$canEdit ??= true;
 $did = $current ? (int) $current['id'] : 0;
 $zn = $zone ? (string) $zone['zone_name'] : (string) ($current['domain_name'] ?? '');
 View::slot('desc', e('The DNS records of your domains, answered by this server\'s nameservers. Changes go live within seconds; the rest of the internet sees them within each record\'s TTL.'));
-if ($zone) {
+if ($zone && $canEdit) {
     View::slot('actions', '<a href="#add-record" class="btn btn-primary">' . icon('plus') . 'Add record</a>');
     View::script('dns');
 }
@@ -163,8 +165,8 @@ foreach ($nsRecords as $r) {
                             <td class="hidden whitespace-nowrap text-xs text-muted md:table-cell" title="<?= (int) $r['ttl'] ?> seconds"><?= e($ttlText((int) $r['ttl'])) ?></td>
                             <td class="whitespace-nowrap">
                                 <div class="flex items-center justify-end gap-1">
-                                    <?php if ($lock): ?>
-                                    <span class="p-2 text-subtle" title="<?= e($r['_why']) ?>"><?= icon('lock', 'h-4 w-4') ?></span>
+                                    <?php if ($lock || !$canEdit): ?>
+                                    <span class="p-2 text-subtle" title="<?= e($lock ? $r['_why'] : 'Editing DNS records isn\'t in your package') ?>"><?= icon('lock', 'h-4 w-4') ?></span>
                                     <?php else: ?>
                                     <?= Ui::iconButton('edit', 'Edit ' . $r['type'] . ' record ' . $r['name'], ['type' => 'button', 'attrs' => ['data-dns-edit' => 'dns-edit-' . $rid, 'aria-expanded' => 'false', 'aria-controls' => 'dns-edit-' . $rid]]) ?>
                                     <?= Ui::deleteForm(
@@ -176,7 +178,7 @@ foreach ($nsRecords as $r) {
                                 </div>
                             </td>
                         </tr>
-                        <?php if (!$lock): ?>
+                        <?php if (!$lock && $canEdit): ?>
                         <tr id="dns-edit-<?= $rid ?>" class="bg-surface-2" hidden data-filter-skip data-dns-edit-row>
                             <td colspan="5">
                                 <form method="post" action="/cpanel/dns/<?= $did ?>/records/<?= $rid ?>" class="grid grid-cols-2 items-start gap-3 py-1 lg:grid-cols-12" data-dns-form>
@@ -196,7 +198,7 @@ foreach ($nsRecords as $r) {
                         <?php endif; ?>
                         <?php endforeach; ?>
                         <?php if (!$records): ?>
-                        <?= Ui::emptyRow(5, 'No records of your own yet', 'Add an A record for @ to point ' . $zn . ' at a server, or an MX record for its mail.', 'list', '<a href="#add-record" class="btn btn-secondary btn-sm">' . icon('plus') . 'Add record</a>') ?>
+                        <?= Ui::emptyRow(5, 'No records of your own yet', 'Add an A record for @ to point ' . $zn . ' at a server, or an MX record for its mail.', 'list', $canEdit ? '<a href="#add-record" class="btn btn-secondary btn-sm">' . icon('plus') . 'Add record</a>' : '') ?>
                         <?php elseif (count($rows) > 8): ?>
                         <tr data-filter-none data-filter-skip hidden><td colspan="5" class="py-8 text-center text-sm text-muted">No record matches that filter.</td></tr>
                         <?php endif; ?>
@@ -218,6 +220,11 @@ foreach ($nsRecords as $r) {
             <?php endif; ?>
         </section>
 
+        <?php if (!$canEdit): ?>
+        <section class="card h-fit">
+            <?= Ui::empty('DNS records are read-only', 'Editing DNS isn\'t in your package. Your hosting provider can change records for you, or add the DNS editor to your package.', 'lock') ?>
+        </section>
+        <?php else: ?>
         <section class="card h-fit scroll-mt-20" id="add-record" aria-labelledby="add-record-title">
             <div class="card-header">
                 <div class="min-w-0">
@@ -237,6 +244,7 @@ foreach ($nsRecords as $r) {
                 <button type="submit" class="btn btn-primary btn-block"><?= icon('plus') ?>Add record</button>
             </form>
         </section>
+        <?php endif; ?>
     </div>
 
     <?php if ($preview !== null): ?>

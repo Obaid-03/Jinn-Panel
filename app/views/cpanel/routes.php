@@ -186,6 +186,14 @@ $noAuto = ['wrap' => 'off', 'spellcheck' => 'false', 'autocapitalize' => 'off', 
             </form>
             <?php endif; ?>
         </div>
+        <?php if (!Features::has('routes')): ?>
+        <div class="card-body">
+            <p class="flex items-start gap-2 text-sm text-muted"><?= icon('lock', 'mt-0.5 h-4 w-4 shrink-0') ?><span>Editing the rules by hand isn't in your package. Following .htaccess (above) keeps working, and you can reset to the default routing.</span></p>
+            <?php if ($active): ?>
+            <pre class="log mt-4" tabindex="0" aria-label="Routing rules in use"><?= e(trim(($o['current']['route'] ?? '') . "\n\n" . ($o['current']['site'] ?? ''))) ?></pre>
+            <?php endif; ?>
+        </div>
+        <?php else: ?>
         <form method="post" action="/cpanel/domains/<?= $id ?>/routes" data-routes-editor>
             <div class="card-body space-y-5">
                 <?= Csrf::field() ?>
@@ -210,5 +218,6 @@ $noAuto = ['wrap' => 'off', 'spellcheck' => 'false', 'autocapitalize' => 'off', 
                 <button type="submit" name="action" value="save" class="btn btn-primary"><?= icon('save') ?>Save my edits</button>
             </div>
         </form>
+        <?php endif; ?>
     </section>
 </div>

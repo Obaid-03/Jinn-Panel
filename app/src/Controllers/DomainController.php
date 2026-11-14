@@ -101,7 +101,7 @@ final class DomainController
 
         // The domain's own page sends back=domain; the list (older views) doesn't.
         $back = ($_POST['back'] ?? '') === 'domain' ? "/cpanel/domains/$id" : '/cpanel/domains';
-        $phpVersion = self::validPhpVersion((string) ($_POST['php_version'] ?? $domain['php_version']));
+        $phpVersion = self::validPhpVersion((string) ($_POST['php_version'] ?? $domain['php_version']), (string) $domain['php_version']);
         // Only the SSL form sends ssl_mode; the PHP version form keeps it as it is.
         $sslRequested = isset($_POST['ssl_mode']) ? (string) $_POST['ssl_mode'] : null;
         $sslMode = $sslRequested === null ? (string) $domain['ssl_mode'] : SslService::resolveMode($sslRequested, $domain['domain_name']);
@@ -170,8 +170,16 @@ final class DomainController
         exit;
     }
 
-    private static function validPhpVersion(string $version): string
+    /**
+     * A PHP version the account may pick: an installed one - or, when its
+     * package doesn't include other PHP versions, the default (or the one
+     * the domain already runs on).
+     */
+    private static function validPhpVersion(string $version, ?string $current = null): string
     {
+        if ($version !== 'default' && $version !== $current && !Features::has('php_versions')) {
+            return $current ?? 'default';
+        }
         if ($version === 'default' || in_array($version, PhpVersionService::selectable(), true)) {
             return $version;
         }
@@ -263,10 +271,17 @@ final class DomainController
         Auth::requireRole(['user']);
         $me = Auth::user();
         $d = self::owned($me, (int) ($params['id'] ?? 0));
+        try {
+            // Reads the site's .htaccess files through its PHP pool.
+            $overview = RoutesService::overview($d);
+        } catch (RuntimeException $e) {
+            error_log('routes overview ' . $d['domain_name'] . ': ' . $e->getMessage());
+            self::backTo($d, 'The routing rules can\'t be shown right now: ' . $e->getMessage());
+        }
         View::render('cpanel/routes', [
             'title' => 'Routes · ' . $d['domain_name'],
             'd' => $d,
-            'o' => RoutesService::overview($d),
+            'o' => $overview,
             'last' => RoutesService::lastResult((string) $d['domain_name']),
             'pending' => RoutesService::pending((string) $d['domain_name']),
         ], 'cpanel');
@@ -279,6 +294,10 @@ final class DomainController
         $me = Auth::user();
         $d = self::owned($me, (int) ($params['id'] ?? 0));
         $action = (string) ($_POST['action'] ?? 'save');
+        if ($action === 'save') {
+            // Hand-edited rules; following .htaccess and resetting stay available.
+            Features::require('routes', '/cpanel/domains/' . (int) $d['id'] . '/routes');
+        }
         if ($action === 'sync_on' || $action === 'sync_off') {
             RoutesService::setSync($d, $action === 'sync_on');
             Flash::ok($action === 'sync_on'
@@ -322,6 +341,7 @@ final class DomainController
         Auth::requireRole(['user']);
         Csrf::requireValid();
         $d = self::owned(Auth::user(), (int) ($params['id'] ?? 0));
+        Features::require('aliases', '/cpanel/domains/' . (int) $d['id']);
         try {
             DomainAliasService::add($d, (string) ($_POST['alias'] ?? ''));
         } catch (Throwable $e) {

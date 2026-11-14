@@ -45,6 +45,8 @@ $router->get('/whm/accounts/{id}', ['AccountController', 'show']);
 $router->get('/whm/accounts/{id}/edit', ['AccountController', 'edit']);
 $router->post('/whm/accounts/{id}', ['AccountController', 'update']);
 $router->post('/whm/accounts/{id}/login-as', ['AccountController', 'loginAs']);
+$router->post('/whm/accounts/{id}/package', ['AccountController', 'package']);
+$router->post('/whm/accounts/{id}/features', ['AccountController', 'features']);
 $router->post('/whm/accounts/{id}/suspend', ['AccountController', 'suspend']);
 $router->post('/whm/accounts/{id}/unsuspend', ['AccountController', 'unsuspend']);
 $router->post('/whm/accounts/{id}/delete', ['AccountController', 'destroy']);

@@ -16,6 +16,7 @@ return [
         'keys' => 4821,
     ],
     'variants' => [
+        'limited-package' => ['features' => ['file_manager' => false, 'cron' => false, 'backups' => false, 'dns_editor' => false, 'php_versions' => false, 'aliases' => false, 'routes' => false, 'object_cache' => false, 'database_access' => false, 'ssh_keys' => false], 'data' => ['creds' => null, 'keys' => null]],
         'object-off' => ['creds' => null, 'keys' => null],
         'empty' => ['domains' => [], 'creds' => null, 'keys' => null],
     ],

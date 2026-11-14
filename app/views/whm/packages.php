@@ -30,6 +30,15 @@ $mb = fn(int $v) => $v >= 1024 ? rtrim(rtrim(number_format($v / 1024, 1), '0'), 
             <div><dt class="text-xs text-muted">Accounts (reseller)</dt><dd class="mt-0.5 font-medium tabular-nums text-fg"><?= (int) $p['max_accounts'] ?></dd></div>
             <?php endif; ?>
         </dl>
+        <?php $pf = Features::forPackage($p); $off = array_keys(array_filter($pf, fn($on) => !$on)); ?>
+        <div class="border-t border-line px-5 py-3 text-sm">
+            <?php if (!$off): ?>
+            <p class="flex items-center gap-2 text-muted"><?= icon('check-circle', 'h-4 w-4 text-success') ?>All <?= count($pf) ?> features</p>
+            <?php else: ?>
+            <p class="text-muted"><?= count($pf) - count($off) ?> of <?= count($pf) ?> features · without:</p>
+            <p class="mt-1.5 flex flex-wrap gap-1.5"><?php foreach ($off as $k): ?><?= Ui::badge(Features::LIST[$k][0], 'neutral') ?><?php endforeach; ?></p>
+            <?php endif; ?>
+        </div>
         <div class="card-footer justify-between">
             <a href="/whm/packages/<?= $id ?>/edit" class="btn btn-secondary btn-sm"><?= icon('edit') ?>Edit</a>
             <?php if ($n === 0): ?>

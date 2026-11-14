@@ -10,6 +10,7 @@ return [
         'aliases' => ['acme.example', 'acme-shop.test'], 'phpVersions' => ['8.4', '8.3', '8.2'],
     ],
     'variants' => [
+        'limited-package' => ['features' => ['file_manager' => false, 'cron' => false, 'backups' => false, 'dns_editor' => false, 'php_versions' => false, 'aliases' => false, 'routes' => false, 'object_cache' => false, 'database_access' => false, 'ssh_keys' => false]],
         'dns-elsewhere' => ['d' => sample_domains()[2], 'ssl' => sample_ssl('no_dns'), 'cert' => null, 'addresses' => ['198.51.100.7'], 'aliases' => [], 'routes' => false],
     ],
 ];

@@ -330,6 +330,19 @@ function test_ui_components_escape(): void
     T::same('badge badge-danger', preg_replace('/^<span class="([^"]+)".*$/s', '$1', Ui::status('failed')), 'status tone');
 }
 
+function test_package_features(): void
+{
+    $all = Features::forPackage(null);
+    T::ok(count($all) === count(Features::LIST) && !in_array(false, $all, true), 'no setting: everything on');
+    T::ok(!in_array(false, Features::forPackage(['features' => null]), true), 'NULL column: everything on');
+    $pkg = ['features' => Features::fromForm(['features' => ['cron' => '1', 'file_manager' => '1']])];
+    $f = Features::forPackage($pkg);
+    T::ok($f['cron'] && $f['file_manager'] && !$f['backups'] && !$f['ssh_keys'], 'unchecked boxes are off', json_encode($f));
+    T::same(['dns_editor' => false, 'ssh_keys' => true], Features::overrides(['feature_overrides' => Features::overridesFromForm(['override' => ['dns_editor' => '0', 'ssh_keys' => '1', 'cron' => '', 'bogus' => '1']])]), 'overrides: only set, known keys');
+    T::same(null, Features::overridesFromForm(['override' => ['cron' => '']]), 'no overrides: NULL');
+    T::same(true, Features::forPackage(['features' => '{"cron":false}'])['backups'], 'a key missing from a package is on');
+}
+
 // ---------------------------------------------------------------------------
 
 $filter = $argv[1] ?? '';

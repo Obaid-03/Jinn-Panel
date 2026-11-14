@@ -125,6 +125,8 @@ require PREVIEW_APP . '/src/View.php';
  *   variants name => data overrides (e.g. 'empty' => ['domains' => []])
  *   flash    list of [type, message] to show
  *   session  extra $_SESSION entries
+ *   features what the account's package leaves out, e.g. ['cron' => false]
+ *            (also per variant)
  *
  * @return array<string, array<string,mixed>>
  */
@@ -151,15 +153,25 @@ function preview_render(string $view, array $fx, ?string $variant = null, ?strin
         $_SESSION['flash'][] = ['type' => $type, 'message' => $msg];
     }
     $data = $fx['data'] ?? [];
+    $features = $fx['features'] ?? [];
     if ($variant !== null) {
         $v = $fx['variants'][$variant] ?? throw new RuntimeException("No variant '$variant' for $view");
         $data = array_replace($data, $v['data'] ?? $v);
         if (isset($v['role'])) {
             $fx['role'] = $v['role'];
         }
+        if (isset($v['features'])) {
+            $features = $v['features'];
+            unset($data['features']);
+        }
     }
     $GLOBALS['preview_quota'] = $fx['quota'] ?? null;
     Auth::as($role ?? ($fx['role'] ?? 'user'));
+    // What the hosting account's package includes (fixture 'features' => [key => false, ...]).
+    Features::forget();
+    if (Auth::id() !== null) {
+        Features::prime((int) Auth::id(), $features);
+    }
     $_SERVER['REQUEST_URI'] = $fx['path'] ?? '/';
     $_SERVER['REQUEST_METHOD'] = 'GET';
     View::reset();

@@ -8,7 +8,7 @@ have been cut) - entries are grouped by development milestone instead.
 ## Unreleased - redesign and account basics (2026-11)
 
 Upgrade by re-running the installer: it applies
-`app/migrations/023_accounts_notifications.sql`, rebuilds the CSS and
+`app/migrations/023_accounts_notifications.sql` and `024_package_features.sql`, rebuilds the CSS and
 re-deploys the worker and pool agent (the file editor and hourly alert
 emails need both).
 
@@ -52,6 +52,14 @@ emails need both).
 - **File Manager editor** for text files (UTF-8, up to 1 MB) and new files;
   upload by drag and drop.
 - **SSH keys** for SFTP logins.
+- **Package features**: ten switches per package (File Manager, cron jobs,
+  self-service backups, DNS editor, other PHP versions, aliases, routing
+  rules, object cache, phpMyAdmin/remote MySQL, SSH keys), enforced by the
+  panel and hidden from the account's menu when off; each account can be
+  switched differently on its page, which also changes its package in one
+  step. Migration `024_package_features.sql`.
+- **Local run** (`dev/local/`): the real panel against MAMP's MySQL, with
+  demo logins.
 - **Local preview** (`dev/preview/`): every view renders with sample data
   on a laptop; CI renders them all and checks labels and button names.
 
@@ -60,6 +68,8 @@ emails need both).
   timestamp).
 - SFTP settings showed the last Server Tweaks job instead of its own.
 - The FTP page's "Restrict to domain" option text was garbled.
+- The Routes tab answered 500 when the site's PHP pool wasn't running; it
+  now says so on the domain page.
 
 ## Unreleased - public launch candidate
 

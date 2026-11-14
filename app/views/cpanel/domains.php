@@ -47,7 +47,7 @@ View::slot('actions', '<a href="#add-domain" class="btn btn-primary">' . icon('p
                             <td>
                                 <div class="flex items-center justify-end gap-1">
                                     <a href="/cpanel/domains/<?= $id ?>" class="btn btn-secondary btn-sm">Manage</a>
-                                    <?= Ui::iconLink('/cpanel/files?domain_id=' . $id, 'folder', 'Files of ' . $d['domain_name']) ?>
+                                    <?= Features::has('file_manager') ? Ui::iconLink('/cpanel/files?domain_id=' . $id, 'folder', 'Files of ' . $d['domain_name']) : '' ?>
                                 </div>
                             </td>
                         </tr>
@@ -69,10 +69,10 @@ View::slot('actions', '<a href="#add-domain" class="btn btn-primary">' . icon('p
                 <?= Ui::field('domain_name', 'Domain name', ['required' => true, 'placeholder' => 'example.com', 'attrs' => ['autocapitalize' => 'off', 'spellcheck' => 'false', 'inputmode' => 'url']]) ?>
                 <?php
                 $phpOptions = ['default' => 'Default (PHP 8.5)'];
-                foreach ($phpVersions as $v) {
+                foreach (Features::has('php_versions') ? $phpVersions : [] as $v) {
                     $phpOptions[$v] = 'PHP ' . $v;
                 }
-                echo Ui::select('php_version', 'PHP version', $phpOptions, 'default');
+                echo count($phpOptions) > 1 ? Ui::select('php_version', 'PHP version', $phpOptions, 'default') : '<input type="hidden" name="php_version" value="default" hidden>';
                 echo Ui::select('ssl_mode', 'Certificate', [
                     'auto' => 'Automatic (recommended)',
                     'letsencrypt' => 'Let\'s Encrypt now',

@@ -10,7 +10,12 @@ $o = [
 ];
 return [
     'layout' => 'whm', 'role' => 'admin', 'path' => '/whm/accounts/10',
-    'data' => ['title' => 'acme', 'a' => $a, 'me' => ['id' => 1, 'role' => 'admin', 'username' => 'admin'], 'o' => $o, 'lastAdmin' => false],
+    'data' => [
+        'title' => 'acme', 'a' => $a, 'me' => ['id' => 1, 'role' => 'admin', 'username' => 'admin'], 'o' => $o, 'lastAdmin' => false,
+        'packages' => sample_packages(),
+        'pkgFeatures' => ['file_manager' => true, 'cron' => true, 'backups' => true, 'dns_editor' => true, 'php_versions' => true, 'aliases' => true, 'routes' => false, 'object_cache' => true, 'database_access' => false, 'ssh_keys' => true],
+        'overrides' => ['database_access' => true, 'backups' => false],
+    ],
     'variants' => [
         'reseller-account' => ['a' => sample_accounts()[0], 'o' => ['package' => sample_packages()[2], 'parent' => null, 'usage' => null, 'domains' => [], 'counts' => ['domains' => 0, 'databases' => 0, 'mailboxes' => 0, 'sftp' => 0, 'accounts' => 12], 'activity' => []]],
         'suspended' => ['a' => sample_accounts()[2], 'o' => ['usage' => null, 'domains' => [], 'activity' => []] + $o],

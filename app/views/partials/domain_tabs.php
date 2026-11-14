@@ -9,7 +9,7 @@ $tabName = (string) $d['domain_name'];
 View::breadcrumbs([['Domains', '/cpanel/domains'], [$tabName]]);
 View::slot('actions',
     '<a href="https://' . e($tabName) . '/" target="_blank" rel="noopener" class="btn btn-secondary">' . icon('external') . 'Open site</a>'
-    . '<a href="/cpanel/files?domain_id=' . $tabId . '" class="btn btn-secondary">' . icon('folder') . 'Files</a>');
+    . (Features::has('file_manager') ? '<a href="/cpanel/files?domain_id=' . $tabId . '" class="btn btn-secondary">' . icon('folder') . 'Files</a>' : ''));
 $tabHrefs = [
     'overview' => "/cpanel/domains/$tabId",
     'routes' => "/cpanel/domains/$tabId/routes",

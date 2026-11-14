@@ -152,6 +152,9 @@ package (disk, bandwidth, domains, databases, mailboxes, SFTP logins), its
 domains, details (type, email, reseller, two-factor, Linux user, PHP exec)
 and recent activity, with:
 
+- **Package and features** - switch the account to another package, and
+  turn each feature on or off for this account only, whatever its package
+  says ("Package (on)" follows the package).
 - **Edit** - email, full name, package and an optional new password (which
   signs the account out everywhere). The username and type can't change.
   A new package's disk quota goes to its SFTP logins at once; hard disk
@@ -209,9 +212,28 @@ mail, 1 FTP), Business (5 GB, 50 GB/mo, 5, 5, 25, 3) and Reseller (20 GB,
 | Max FTP accounts | Checked when creating an SFTP login. |
 | Max accounts (for resellers) | Admin packages only: how many hosting accounts a reseller on this package may create (0 = none). |
 
+**Features** - switched on or off per package (all on for packages made
+before features existed), and per account on top of that:
+
+| Feature | Off means |
+|---|---|
+| File Manager | No File Manager (or its editor); SFTP still works. |
+| Cron jobs | No Cron Jobs page, and existing jobs stop running. |
+| Self-service backups | No Backups page (run, download, restore). The server's daily backup still includes the account. |
+| DNS editor | DNS records are read-only. |
+| Other PHP versions | New domains run on the default PHP; a domain already on another version keeps it but can't switch to a third. |
+| Domain aliases | No new aliases (existing ones stay and can be removed). |
+| Routing rules | Hand-edited rules are refused; following `.htaccess` and resetting still work. |
+| Object cache | It can't be turned on (one already on stays). |
+| phpMyAdmin and remote MySQL | No phpMyAdmin; no new remote hosts (existing ones can be removed). |
+| SSH keys for SFTP | No new keys (existing ones can be removed). |
+
+Pages for tools that are off disappear from the account's menu and
+dashboard; opening one says it isn't in the package.
+
 Disk, bandwidth, domains and databases must be at least 1; email and FTP
-may be 0. There is no "unlimited" value. **Edit** changes a package's name
-and limits for every account on it (lowering a limit deletes nothing;
+may be 0. There is no "unlimited" value. **Edit** changes a package's name,
+limits and features for every account on it (lowering a limit deletes nothing;
 accounts over it can't add more); a reseller can edit only its own
 packages. A package in use can't be deleted (the list shows how many
 accounts use each). Every

@@ -22,6 +22,7 @@ final class FileManagerController
     private static function context(bool $post = true): array
     {
         Auth::requireRole(['user']);
+        Features::require('file_manager', '/cpanel/files');
         if ($post) {
             Csrf::requireValid();
         }
@@ -38,6 +39,7 @@ final class FileManagerController
     public static function index(): void
     {
         Auth::requireRole(['user']);
+        Features::require('file_manager');
         $me = Auth::user();
         $domainsStmt = Database::app()->prepare('SELECT * FROM domains WHERE user_id = ? ORDER BY domain_name');
         $domainsStmt->execute([$me['id']]);

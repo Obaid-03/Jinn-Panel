@@ -28,6 +28,7 @@ $port = (int) Config::SFTP_PUBLIC_PORT;
                             </div>
                             <?= Ui::deleteForm('/cpanel/ftp/' . (int) $a['id'] . '/delete', 'Delete the SFTP login ' . $a['username'] . '? Programs using it stop connecting. Files are not touched.', 'Delete ' . $a['username']) ?>
                         </div>
+                        <?php if ($keys || Features::has('ssh_keys')): ?>
                         <details class="mt-2">
                             <summary class="inline-flex cursor-pointer list-none items-center gap-1.5 rounded text-sm text-muted hover:text-fg [&::-webkit-details-marker]:hidden"><?= icon('key', 'h-4 w-4') ?><?= $keys ? 'SSH keys' : 'Add an SSH key' ?><?= icon('chevron-down', 'h-3.5 w-3.5') ?></summary>
                             <form method="post" action="/cpanel/ftp/<?= (int) $a['id'] ?>/keys" class="mt-3 space-y-3 rounded-lg border border-line bg-surface-2 p-4">
@@ -41,6 +42,7 @@ $port = (int) Config::SFTP_PUBLIC_PORT;
                                 <button class="btn btn-primary btn-sm"><?= icon('save') ?>Save keys</button>
                             </form>
                         </details>
+                        <?php endif; ?>
                     </li>
                     <?php endforeach; ?>
                 </ul>

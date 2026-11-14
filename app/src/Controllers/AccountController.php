@@ -33,12 +33,16 @@ final class AccountController
         Auth::requireRole(['admin', 'reseller']);
         $me = Auth::user();
         $target = self::scopedOrBack((int) $params['id'], $me);
+        $o = AccountService::overview($target);
         View::render('whm/account', [
             'title' => $target['username'],
             'a' => $target,
             'me' => $me,
-            'o' => AccountService::overview($target),
+            'o' => $o,
             'lastAdmin' => AccountService::isLastAdmin($target),
+            'packages' => $target['role'] === 'admin' ? [] : AccountService::availablePackages($me),
+            'pkgFeatures' => Features::forPackage($o['package']),
+            'overrides' => Features::overrides($target),
         ], 'whm');
     }
 
@@ -112,6 +116,37 @@ final class AccountController
         }
         Flash::ok("Account \"{$target['username']}\" saved." . ((string) ($_POST['password'] ?? '') !== '' ? ' Its new password is in effect and its other sessions were signed out.' : ''));
         header("Location: /whm/accounts/{$target['id']}");
+        exit;
+    }
+
+    /** The account page's package switch. */
+    public static function package(array $params): void
+    {
+        Auth::requireRole(['admin', 'reseller']);
+        Csrf::requireValid();
+        $target = self::scopedOrBack((int) $params['id'], Auth::user());
+        Audit::target((int) $target['id']);
+        $problem = AccountService::changePackage($target, (int) ($_POST['package_id'] ?? 0), Auth::user());
+        $problem === null
+            ? Flash::ok("\"{$target['username']}\" is on the new package. Its limits and features apply now (hard disk quotas within the hour).")
+            : Flash::error($problem);
+        header("Location: /whm/accounts/{$target['id']}");
+        exit;
+    }
+
+    /** The account page's feature switches (on top of its package). */
+    public static function features(array $params): void
+    {
+        Auth::requireRole(['admin', 'reseller']);
+        Csrf::requireValid();
+        $target = self::scopedOrBack((int) $params['id'], Auth::user());
+        if ($target['role'] !== 'user') {
+            self::back('Only hosting accounts have features.', true, (int) $target['id']);
+        }
+        Audit::target((int) $target['id']);
+        AccountService::setFeatureOverrides($target, $_POST);
+        Flash::ok("Features of \"{$target['username']}\" saved.");
+        header("Location: /whm/accounts/{$target['id']}#features");
         exit;
     }
 

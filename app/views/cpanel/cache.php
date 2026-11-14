@@ -32,7 +32,9 @@ if ($creds) {
                 <p class="card-desc">A Redis-compatible in-memory store where WordPress, Laravel and other apps keep database results and sessions.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <?php if (!$creds): ?>
+                <?php if (!$creds && !Features::has('object_cache')): ?>
+                <span class="flex items-center gap-1.5 text-sm text-muted"><?= icon('lock', 'h-4 w-4') ?>Not in your package</span>
+                <?php elseif (!$creds): ?>
                 <form method="post" action="/cpanel/cache/object">
                     <?= Csrf::field() ?>
                     <button type="submit" name="op" value="enable" class="btn btn-primary"><?= icon('bolt') ?>Turn on</button>
