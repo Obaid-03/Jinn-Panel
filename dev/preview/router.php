@@ -21,12 +21,6 @@ if ($uri !== '/' && is_file(__DIR__ . '/../../app/public' . $uri)) {
     return false; // static asset
 }
 
-// The Plan 1 v3 design prototype: /__proto/<screen>, assets from dev/prototype/public.
-if (str_starts_with($uri, '/__proto')) {
-    require __DIR__ . '/../prototype/serve.php';
-    return true;
-}
-
 require __DIR__ . '/bootstrap.php';
 // The panel's own policy (app/src/bootstrap.php), so an inline script or
 // on*= handler fails here exactly as it would on the server.

@@ -24,5 +24,3 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Built by dev/prototype/build.sh
-dev/prototype/public/proto.css

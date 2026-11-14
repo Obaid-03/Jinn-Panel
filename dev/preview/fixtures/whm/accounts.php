@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../_sample.php';
 require_once __DIR__ . '/../_sample_stats.php';
 
-// The prototype's 12 sample customers, plus the admin and a reseller, as the controller returns them.
+// 12 sample customers (stats_accounts), plus the admin and a reseller, as the controller returns them.
 $accounts = [
     ['id' => 1, 'username' => 'admin', 'email' => 'admin@example.com', 'full_name' => 'Server admin', 'role' => 'admin', 'status' => 'active', 'package_name' => null, 'disk_quota_mb' => null, 'reseller_username' => null, 'used_bytes' => null, 'disk_pct' => null, 'over_disk' => 0, 'over_bandwidth' => 0, 'domain_count' => 0, 'traffic_14d' => 0, 'created_at' => '2026-01-01 09:00:00'],
     ['id' => 2, 'username' => 'resell', 'email' => 'sales@reseller.test', 'full_name' => 'North Web Reselling', 'role' => 'reseller', 'status' => 'active', 'package_name' => 'Reseller 50', 'disk_quota_mb' => 51200, 'reseller_username' => null, 'used_bytes' => null, 'disk_pct' => null, 'over_disk' => 0, 'over_bandwidth' => 0, 'domain_count' => 0, 'traffic_14d' => 0, 'created_at' => '2026-02-01 09:00:00'],

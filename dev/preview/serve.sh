@@ -6,9 +6,8 @@ here="$(cd "$(dirname "$0")" && pwd)"
 repo="$here/../.."
 port="${PORT:-8787}"
 "$repo/dev/build-css.sh"
-"$repo/dev/prototype/build.sh" >/dev/null 2>&1 || echo "(prototype stylesheet not built)"
 "$repo/dev/build-css.sh" --watch >/dev/null 2>&1 &
 watcher=$!
 trap 'kill $watcher 2>/dev/null' EXIT
-echo "Preview: http://127.0.0.1:$port/__preview   Prototype: http://127.0.0.1:$port/__proto"
+echo "Preview: http://127.0.0.1:$port/__preview   Charts: http://127.0.0.1:$port/__charts"
 php -S "127.0.0.1:$port" -t "$repo/app/public" "$here/router.php"
