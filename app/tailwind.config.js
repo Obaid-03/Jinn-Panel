@@ -19,6 +19,7 @@ module.exports = {
     './public/**/*.php',
     './public/assets/js/**/*.js',
     './src/Support/Ui.php',
+    './src/Support/Chart.php',
     './src/View.php',
   ],
   // theme.js resolves "system" and always sets data-theme on <html>.
@@ -52,15 +53,16 @@ module.exports = {
         info: tone('info'),
       },
       fontFamily: {
-        sans: ['ui-sans-serif', 'system-ui', '-apple-system', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', '"SF Mono"', 'Menlo', 'Consolas', '"Liberation Mono"', 'monospace'],
+        // Bundled (public/assets/fonts, SIL OFL); the system faces stand in until they load.
+        sans: ['"IBM Plex Sans"', 'ui-sans-serif', 'system-ui', '-apple-system', '"Segoe UI"', 'Roboto', 'Arial', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', '"SF Mono"', 'Menlo', 'Consolas', 'monospace'],
       },
       boxShadow: {
         card: 'var(--jp-shadow-card)',
         pop: 'var(--jp-shadow-pop)',
       },
       maxWidth: {
-        page: '76rem',
+        page: '84rem',
       },
     },
   },

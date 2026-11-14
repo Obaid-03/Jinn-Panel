@@ -5,6 +5,7 @@
  * $nav           list<array{label:?string, items:list<array{href:string,label:string,icon:string}>}>
  * $quickActions  list<array{href:string,label:string,icon:string}>  extra entries for the Ctrl-K menu
  * $roleLabel     string  shown under the user name
+ * $bell          string  optional top-bar alerts button (HTML)
  * $securityHref  string  the login security page
  * $content       string  rendered page HTML
  * $title         string  page title
@@ -36,6 +37,8 @@ if ($crumbs === null) {
     }
     $crumbs[] = [$title ?? ''];
 }
+// The trail shows above the title only when it leads somewhere (a parent page link).
+$trail = count(array_filter(array_slice($crumbs, 0, -1), fn($c) => !empty($c[1]))) > 0;
 
 // Ctrl-K menu: every page in the sidebar plus the quick actions.
 $palette = [];
@@ -67,18 +70,21 @@ $impersonator = $_SESSION['impersonator'] ?? null;
 <body class="min-h-screen">
 <a href="#main" class="skip-link">Skip to content</a>
 
-<!-- Sidebar -->
-<aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r border-line bg-surface lg:translate-x-0" aria-label="Main">
-    <div class="flex h-14 shrink-0 items-center gap-2.5 px-5">
-        <a href="<?= e($nav[0]['items'][0]['href'] ?? '/') ?>" class="flex items-center gap-2.5 rounded-lg">
-            <svg class="h-7 w-7" viewBox="0 0 140 140" aria-hidden="true"><defs><linearGradient id="jp-mark" x1="0" y1="0" x2="140" y2="140" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs><rect width="140" height="140" rx="32" fill="url(#jp-mark)"/><path d="M86 35v57c0 17.5-11 28.5-29.5 28.5-12 0-20.8-5-26.3-14.2l12-11c3.3 5.5 7.7 8.8 13.7 8.8 8.2 0 12.6-4.9 12.6-16.4V35H86Z" fill="#fff"/><rect x="96" y="31" width="13" height="13" rx="3" fill="#fff" fill-opacity=".55"/></svg>
-            <span class="font-semibold tracking-tight text-fg"><?= e(Config::APP_NAME) ?></span>
+<!-- Sidebar: on the canvas, the active page a raised tab -->
+<aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-60 -translate-x-full flex-col bg-canvas max-lg:border-r max-lg:border-line lg:translate-x-0" aria-label="Main">
+    <div class="flex h-16 shrink-0 items-center gap-2.5 px-5">
+        <a href="<?= e($nav[0]['items'][0]['href'] ?? '/') ?>" class="flex min-w-0 items-center gap-2.5 rounded-lg">
+            <svg class="h-7 w-7 shrink-0" viewBox="0 0 140 140" aria-hidden="true"><defs><linearGradient id="jp-mark" x1="0" y1="0" x2="140" y2="140" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs><rect width="140" height="140" rx="32" fill="url(#jp-mark)"/><path d="M86 35v57c0 17.5-11 28.5-29.5 28.5-12 0-20.8-5-26.3-14.2l12-11c3.3 5.5 7.7 8.8 13.7 8.8 8.2 0 12.6-4.9 12.6-16.4V35H86Z" fill="#fff"/><rect x="96" y="31" width="13" height="13" rx="3" fill="#fff" fill-opacity=".55"/></svg>
+            <span class="min-w-0 leading-tight">
+                <span class="block text-[14px] font-semibold text-fg"><?= e(Config::APP_NAME) ?></span>
+                <span class="block truncate font-mono text-[11.5px] text-subtle"><?= e(Config::SERVER_HOSTNAME) ?></span>
+            </span>
         </a>
         <button type="button" class="btn btn-icon ml-auto lg:hidden" data-sidebar-close aria-label="Close menu"><?= icon('close', 'h-5 w-5') ?></button>
     </div>
-    <nav class="flex-1 overflow-y-auto px-3 pb-4">
+    <nav class="flex-1 overflow-y-auto px-3 pb-6">
         <?php foreach ($nav as $group): ?>
-            <?php if (!empty($group['label'])): ?><p class="nav-section"><?= e($group['label']) ?></p><?php else: ?><div class="pt-2"></div><?php endif; ?>
+            <?php if (!empty($group['label'])): ?><p class="nav-section"><?= e($group['label']) ?></p><?php else: ?><div class="pt-1"></div><?php endif; ?>
             <ul class="space-y-0.5">
             <?php foreach ($group['items'] as $item): ?>
                 <li><a href="<?= e($item['href']) ?>" class="nav-link"<?= $item['href'] === $activeHref ? ' aria-current="page"' : '' ?>><?= icon($item['icon']) ?><span><?= e($item['label']) ?></span></a></li>
@@ -86,36 +92,19 @@ $impersonator = $_SESSION['impersonator'] ?? null;
             </ul>
         <?php endforeach; ?>
     </nav>
-    <div class="border-t border-line px-5 py-3 text-xs text-subtle">
-        <span class="flex items-center gap-2"><?= icon('server', 'h-3.5 w-3.5') ?><span class="truncate"><?= e(Config::SERVER_HOSTNAME) ?></span></span>
-    </div>
 </aside>
 <div id="sidebar-backdrop" class="fixed inset-0 z-30 hidden bg-black/40 lg:hidden" data-sidebar-close></div>
 
-<div class="flex min-h-screen min-w-0 flex-col lg:pl-64">
-    <header class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-line bg-surface/85 px-4 backdrop-blur sm:px-6">
-        <button type="button" class="btn btn-icon -ml-2 lg:hidden" id="sidebar-toggle" aria-controls="sidebar" aria-expanded="false" aria-label="Open menu"><?= icon('menu', 'h-5 w-5') ?></button>
+<div class="flex min-h-screen min-w-0 flex-col lg:pl-60">
+    <header class="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-3 bg-canvas/90 px-4 backdrop-blur sm:px-6 lg:pl-2 lg:pr-8">
+        <button type="button" class="btn btn-icon -ml-1 lg:hidden" id="sidebar-toggle" aria-controls="sidebar" aria-expanded="false" aria-label="Open menu"><?= icon('menu', 'h-5 w-5') ?></button>
 
-        <nav aria-label="Breadcrumb" class="min-w-0 flex-1">
-            <ol class="flex min-w-0 items-center gap-1.5 text-sm">
-                <?php foreach ($crumbs as $i => $c): $last = $i === count($crumbs) - 1; ?>
-                <li class="flex min-w-0 items-center gap-1.5<?= $last ? '' : ' hidden sm:flex' ?>">
-                    <?php if ($i > 0): ?><span class="<?= $i === 1 ? 'hidden text-subtle sm:inline' : 'text-subtle' ?>" aria-hidden="true"><?= icon('chevron-right', 'h-3.5 w-3.5') ?></span><?php endif; ?>
-                    <?php if (!$last && !empty($c[1])): ?>
-                    <a href="<?= e($c[1]) ?>" class="truncate text-muted hover:text-fg"><?= e($c[0]) ?></a>
-                    <?php else: ?>
-                    <span class="truncate <?= $last ? 'font-medium text-fg' : 'text-muted' ?>"<?= $last ? ' aria-current="page"' : '' ?>><?= e($c[0]) ?></span>
-                    <?php endif; ?>
-                </li>
-                <?php endforeach; ?>
-            </ol>
-        </nav>
-
-        <button type="button" class="hidden items-center gap-2 rounded-lg border border-line bg-surface-2 py-1.5 pl-2.5 pr-1.5 text-sm text-subtle transition-colors hover:border-line-strong hover:text-muted md:flex" data-palette-open>
-            <?= icon('search', 'h-4 w-4') ?><span class="pr-6">Search…</span><kbd class="kbd">Ctrl K</kbd>
+        <button type="button" class="flex h-9 min-w-0 max-w-md flex-1 items-center gap-2 rounded-[9px] border border-line bg-surface px-3 text-left text-[13.5px] text-subtle transition-colors hover:border-line-strong" data-palette-open>
+            <?= icon('search', 'h-4 w-4 shrink-0') ?><span class="truncate"><?= ($me['role'] ?? '') === 'user' ? 'Find a domain or page' : 'Find an account, domain or page' ?></span><kbd class="kbd ml-auto hidden sm:inline-flex">Ctrl K</kbd>
         </button>
-        <button type="button" class="btn btn-icon md:hidden" data-palette-open aria-label="Search"><?= icon('search', 'h-5 w-5') ?></button>
 
+        <div class="ml-auto flex items-center gap-1">
+        <?= $bell ?? '' ?>
         <button type="button" class="btn btn-icon" data-theme-toggle aria-label="Theme" title="Theme">
             <span data-theme-icon="light"><?= icon('sun', 'h-5 w-5') ?></span>
             <span data-theme-icon="dark" hidden><?= icon('moon', 'h-5 w-5') ?></span>
@@ -123,9 +112,9 @@ $impersonator = $_SESSION['impersonator'] ?? null;
         </button>
 
         <details class="menu" data-menu>
-            <summary class="flex cursor-pointer items-center gap-2 rounded-lg p-1 hover:bg-surface-3" aria-label="Account menu">
-                <span class="flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent-text"><?= e($initials) ?></span>
-                <?= icon('chevron-down', 'hidden h-4 w-4 text-subtle sm:block') ?>
+            <summary class="ml-1 flex cursor-pointer items-center gap-2 rounded-[9px] p-1 pr-2 hover:bg-surface-3" aria-label="Account menu">
+                <span class="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-fg"><?= e($initials) ?></span>
+                <span class="hidden text-left leading-tight md:block"><span class="block text-[13px] font-medium text-fg"><?= e($me['username'] ?? '') ?></span><span class="block text-[11.5px] text-subtle"><?= e($roleLabel) ?></span></span>
             </summary>
             <div class="menu-panel">
                 <div class="px-2.5 pb-2 pt-1.5">
@@ -141,6 +130,7 @@ $impersonator = $_SESSION['impersonator'] ?? null;
                 </form>
             </div>
         </details>
+        </div>
     </header>
 
     <?php if ($impersonator): ?>
@@ -153,9 +143,25 @@ $impersonator = $_SESSION['impersonator'] ?? null;
     </div>
     <?php endif; ?>
 
-    <main id="main" class="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8" tabindex="-1">
+    <main id="main" class="flex-1 px-4 pb-12 pt-2 sm:px-6 lg:pl-2 lg:pr-8" tabindex="-1">
         <div class="page">
             <?php $actions = View::slotGet('actions'); $desc = View::slotGet('desc'); ?>
+            <?php if ($trail): ?>
+            <nav aria-label="Breadcrumb" class="mb-1.5">
+                <ol class="flex min-w-0 flex-wrap items-center gap-1.5 text-[13px]">
+                    <?php foreach ($crumbs as $i => $c): $last = $i === count($crumbs) - 1; ?>
+                    <li class="flex min-w-0 items-center gap-1.5">
+                        <?php if ($i > 0): ?><span class="text-subtle" aria-hidden="true"><?= icon('chevron-right', 'h-3.5 w-3.5') ?></span><?php endif; ?>
+                        <?php if (!$last && !empty($c[1])): ?>
+                        <a href="<?= e($c[1]) ?>" class="truncate text-muted hover:text-fg"><?= e($c[0]) ?></a>
+                        <?php else: ?>
+                        <span class="truncate text-subtle"<?= $last ? ' aria-current="page"' : '' ?>><?= e($c[0]) ?></span>
+                        <?php endif; ?>
+                    </li>
+                    <?php endforeach; ?>
+                </ol>
+            </nav>
+            <?php endif; ?>
             <?php if (View::slotGet('header') !== 'none'): ?>
             <div class="page-header">
                 <div class="min-w-0">

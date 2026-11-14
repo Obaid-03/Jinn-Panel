@@ -15,12 +15,19 @@ there is no build step beyond the Tailwind CLI and no front-end framework.
 
 ## Look and feel
 
-Calm and dense: neutral surfaces, one accent colour (indigo), status colours
-only for status. Light and dark themes from the same tokens; the viewer
-picks light, dark or "system" with the button in the top bar. Motion only
-on state changes (toasts, dialogs, progress), never ambient, and none for
-people who ask their OS for reduced motion. Monospace for technical values
-(paths, hostnames, records, keys).
+An instrument panel: quiet, cool surfaces, one accent colour (Jinn violet),
+status colours only for status. Light and dark themes from the same tokens;
+the viewer picks light, dark or "system" with the button in the top bar.
+Motion only on state changes (toasts, dialogs, progress), never ambient,
+and none for people who ask their OS for reduced motion.
+
+Type is IBM Plex Sans for the interface and IBM Plex Mono for technical
+values (paths, hostnames, records, keys). Both are bundled in
+`public/assets/fonts` (SIL Open Font License, `OFL-IBM-Plex.txt`), so the
+panel makes no request to a font service; until they load, the system
+faces stand in. Numbers in tables, stats and charts use aligned
+(tabular) digits so columns line up. Labels are sentence case, never all
+capitals.
 
 ## Working on views locally (preview)
 
@@ -70,12 +77,20 @@ colours like `bg-slate-100` or `text-red-700`:
 
 | Token | Use |
 |---|---|
-| `bg-canvas` | page background |
-| `bg-surface`, `bg-surface-2`, `bg-surface-3` | cards; table headers and footers; subtle fills, hovers |
+| `bg-canvas` | page background, sidebar and top bar |
+| `bg-surface`, `bg-surface-2`, `bg-surface-3` | cards and panels; table headers, footers and insets; subtle fills, hovers |
 | `border-line`, `border-line-strong` | dividers and card borders; input borders |
 | `text-fg`, `text-muted`, `text-subtle` | main text; secondary text; hints and placeholders (all pass WCAG AA) |
 | `bg-accent`, `text-accent-text`, `bg-accent-soft` | primary actions; links and active items; selected backgrounds |
 | `success`, `warning`, `danger`, `info` (+ `-soft`, `-text`) | status only: `bg-danger-soft text-danger-text` |
+
+Chart colours are separate CSS variables, `--jp-series-1` to `--jp-series-4`
+and `--jp-series-other`, used through the classes `s1` to `s4` and `so`.
+The order is fixed and was checked for colour-blind separation in both
+themes: a chart's first series is always `s1`, a fifth and later fold into
+"Other" (`so`), and a series keeps its colour when a filter hides others.
+Never use a status colour for a series, or a series colour for status.
+`--jp-chart-grid` and `--jp-chart-axis` draw the recessive grid and baseline.
 
 ## Component classes
 
@@ -94,6 +109,11 @@ Plain CSS classes (in `@layer components`), used directly in views:
 | `tabs`, `tab` | tab bar (prefer `Ui::tabs()`) |
 | `link`, `link-muted`, `mono`, `kbd`, `chip`, `log` | text bits; `log` is a scrolling monospace box |
 | `empty`, `stat`, `grid-cards`, `stack`, `section-title` | empty states, dashboard numbers, card grids, vertical rhythm |
+| `panel`, `panel-row` | a card split into rows by hairlines (a dashboard band of figures) |
+| `figure`, `figure-sm`, `delta-up`, `delta-down` | a big number with aligned digits; the change beside it (an arrow and words, not colour alone) |
+| `segmented` | a row of mutually exclusive links or buttons (chart ranges); mark the chosen one `aria-current` / `aria-pressed` |
+| `th-sort` | a sortable column header link (`aria-sort` on the `th`) |
+| `chart`, `chart-plot`, `chart-*` | chart parts drawn by `Chart::` - not used by hand |
 | `disclosure` | a styled `<details>` |
 | `menu`, `menu-panel`, `menu-item` | a dropdown (`<details class="menu" data-menu>`) |
 | `dialog`, `dialog-body`, `dialog-title`, `dialog-text`, `dialog-footer` | a `<dialog>` opened with `data-dialog-open` |
@@ -129,8 +149,9 @@ it is where translations will be looked up, so new text should use it.
 ## Page structure
 
 The layout (`views/partials/shell.php`) draws the sidebar, top bar
-(breadcrumbs, Ctrl-K search, theme, account menu), the page title from
-`$title`, toasts for flash messages and the confirm dialog. A view only
+(Ctrl-K search, theme, account menu), the page title from `$title` with
+breadcrumbs above it when they lead to a parent page, toasts for flash
+messages and the confirm dialog. A view only
 renders the page body, and can hand the layout:
 
 ```php
