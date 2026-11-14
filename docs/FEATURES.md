@@ -19,8 +19,8 @@ There are three roles. The role is read from the database on every request,
 so a change (or a suspension) takes effect immediately.
 
 - **admin** - the whole server. Sees every account, every package, the
-  server settings, DNS, backups and service logs. There is one admin,
-  created by `/setup`; WHM can't create another.
+  server settings, DNS, backups and service logs. The first admin is created by `/setup`; admins can create more in WHM >
+  Accounts, and the last active admin can't be suspended or deleted.
 - **reseller** - a WHM login without hosting of its own. Sees only the
   hosting accounts it created, the global packages plus its own, its own
   migrations and the activity of itself and its accounts. It can create as
@@ -49,6 +49,17 @@ read customer files; file work goes through the account's pool.
   `panel.<hostname>` with a single-use token (60 seconds).
 - `/` sends a signed-in user to `/cpanel`, admins and resellers to `/whm`,
   everyone else to `/login`.
+
+**Forgot password.** The sign-in page links to `/login/forgot`: a
+username or email gets a single-use link (valid one hour, always on the
+panel hostname) at the account's email address. The answer doesn't say
+whether the account exists, and requests are throttled like failed
+sign-ins. Choosing a new password signs out every other session.
+
+**Two-factor recovery codes.** Turning two-factor on shows ten one-time
+recovery codes once; at the second sign-in step "Use a recovery code"
+signs in with one instead of the authenticator code. Login security shows
+how many are left and makes new ones (with the password).
 
 **First run - `/setup`.** Until an admin exists, every page redirects to
 `/setup`. It shows whether MariaDB, FrankenPHP, Stalwart, SFTPGo and Knot
@@ -99,24 +110,35 @@ admin-only page.
 ### Dashboard
 
 - Counters: **Resellers** (admin only), **Hosting Accounts**, **Domains
-  Hosted** - a reseller's counts cover only its own accounts.
-- Admin only: **Server resources** (disk use of `/`, memory in use) and
-  **Services** (MariaDB, FrankenPHP, Stalwart, SFTPGo, Knot shown active or
-  inactive by whether their port accepts a connection).
+  Hosted**, **Suspended** - a reseller's counts cover only its own accounts.
+- Admin only: **Needs attention** - the top five alerts (see
+  [Alerts](#alerts-admin)), or "All clear".
+- Admin only: **Server** (disk use of `/`, memory, load against the CPU
+  count, uptime) and **Services** (MariaDB, FrankenPHP, Stalwart, SFTPGo,
+  Knot shown running or not answering by whether their port accepts a
+  connection).
+- **Recent activity** - the last eight entries of the activity log (a
+  reseller sees its own and its accounts').
 - Admin only: **Live logs** - pick MariaDB, FrankenPHP, Stalwart, SFTPGo,
   Knot or any `jinnpanel-php-fpm@<version>` instance and see its last 200
   journal lines (the root worker refreshes them every 5 seconds; reload the
   page to see the latest). **Pull latest 1000 lines** fetches a deeper
   snapshot.
-- **Quick actions**: Create account, Create package.
+- **Create account** in the page header.
 
 ### Accounts
 
-Lists hosting accounts (and, for the admin, resellers) with role, owning
-reseller (admin view), package and status.
+Lists hosting accounts (and, for the admin, resellers and administrators)
+with package, owning reseller (admin view), disk use, domain count, quota
+warnings and status, a filter box, **Log in as** for active hosting
+accounts and **Manage**.
 
-**Create account** - account type (admin only: hosting account or
-reseller), username, full name, email, password and hosting package.
+**Create account** - account type (admin only: hosting account, reseller
+or administrator), username, full name, email, password (with a
+generator) and hosting package (administrators have none), and **Send a
+welcome email** (when welcome emails are on in [Notifications](#notifications-admin)):
+where to sign in, the username and a link to choose their own password,
+valid 3 days - the password itself is never emailed.
 Hosting-account usernames are 3-16 lowercase letters or digits starting
 with a letter; reseller logins may be 3-32 characters with `_`. Reserved
 names (`root`, `admin`, `mail`, `www`, service names, anything starting with
@@ -125,14 +147,24 @@ are refused. Username and email must be unique; a hosting account needs a packag
 global packages or its own, and is stopped at its package's account limit.
 Creating a hosting account creates its Linux user and PHP home.
 
-Per row:
+**The account's page** (click its name) shows its usage against the
+package (disk, bandwidth, domains, databases, mailboxes, SFTP logins), its
+domains, details (type, email, reseller, two-factor, Linux user, PHP exec)
+and recent activity, with:
 
+- **Edit** - email, full name, package and an optional new password (which
+  signs the account out everywhere). The username and type can't change.
+  A new package's disk quota goes to its SFTP logins at once; hard disk
+  quotas and bandwidth follow at the next hourly usage run.
+- **Log in as** (hosting accounts) - opens the account's own panel as it
+  sees it, with a banner and a button back to WHM. Recorded in the activity
+  log. A reseller can do this for its own accounts.
 - **exec on/off** (admin, hosting accounts) - whether the account's PHP
   may run programs (`exec`, `passthru`, `shell_exec`, `system`,
   `proc_open`, `popen`, `pcntl_exec`, `dl`). Off by default; applies to its
   PHP-FPM pools and its cron jobs.
-- **2FA** (admin, shown only when two-factor is on) - turns it off for that
-  user and ends their sessions.
+- **Reset two-factor** (admin, shown only when two-factor is on) - turns it
+  off for that user, removes their recovery codes and ends their sessions.
 - **Suspend / Unsuspend** - for a hosting account, suspension:
   - signs it out everywhere and blocks its panel login;
   - makes every site answer `503` "This website is temporarily
@@ -147,7 +179,8 @@ Per row:
 
   Unsuspending turns each part back on. Each part is done separately; any
   that failed are listed. Suspending a reseller only blocks the reseller's
-  own login - its customers stay up.
+  own login - its customers stay up. The last active administrator can't
+  be suspended or deleted; nobody can act on their own account here.
 - **Delete** - for a hosting account, best-effort per resource: every
   domain's vhost, DNS zone (or its records in a parent zone), aliases, PHP
   settings and page cache; its object cache login; its databases and every
@@ -157,9 +190,6 @@ Per row:
   Linux user and moves its site folders to
   `/var/lib/jinnpanel/removed/<username>-<timestamp>/` (root only), so a
   later account never inherits them. Backups already taken are kept.
-
-There is no edit screen: an account's package, email or password can't be
-changed from WHM (see limitations).
 
 ### Packages
 
@@ -180,8 +210,11 @@ mail, 1 FTP), Business (5 GB, 50 GB/mo, 5, 5, 25, 3) and Reseller (20 GB,
 | Max accounts (for resellers) | Admin packages only: how many hosting accounts a reseller on this package may create (0 = none). |
 
 Disk, bandwidth, domains and databases must be at least 1; email and FTP
-may be 0. There is no "unlimited" value and no edit. A package in use
-can't be deleted (the list shows how many accounts use each). Every
+may be 0. There is no "unlimited" value. **Edit** changes a package's name
+and limits for every account on it (lowering a limit deletes nothing;
+accounts over it can't add more); a reseller can edit only its own
+packages. A package in use can't be deleted (the list shows how many
+accounts use each). Every
 hosting account gets a package when it's created or migrated.
 
 ### Resellers
@@ -222,6 +255,25 @@ Sign-ins and every change made through the panel: when, who, action,
 detail, account affected and source IP. Searchable by action, user, detail
 or exact IP, 100 per page. The admin sees everything; a reseller sees
 entries by or about itself and its accounts.
+
+### Alerts (admin)
+
+Everything that needs attention right now, most serious first: problems
+found by the hourly server health check, services that don't answer, the
+root disk over 90%, accounts over their disk quota or out of bandwidth,
+failed backups (last 2 days) and migrations (last 7 days), Let's Encrypt
+certificates expiring within 14 days, and domains whose routing rules need
+a review. Alerts clear by themselves once fixed. New problems are emailed
+hourly (once each) when alert emails are on.
+
+### Notifications (admin)
+
+The mail the panel sends itself, through the local mail server: the **From
+address** (it must be on a mail domain hosted on this server, or Stalwart
+won't relay it) and name, whether new accounts may get a **welcome email**,
+whether **new alerts are emailed**, and where alerts go (default: every
+active administrator's email). **Send test email** checks delivery.
+Password reset emails are always on.
 
 ### Backups (admin)
 
@@ -468,8 +520,9 @@ Stalwart uses the server hostname's Let's Encrypt certificate.
 SFTP only (port 2022, SCP works too); there is no plain FTP. Create a login
 `<username>_<name>` (password 10+ characters) either for **All my sites**
 (each site appears as `/<domain>`) or restricted to one domain's folder.
-Each login has the package's disk quota in SFTPGo. Delete with the trash
-icon.
+Each login has the package's disk quota in SFTPGo. **SSH keys**: paste
+OpenSSH public keys (one per line, up to 10) to sign in with a key as well
+as the password. Delete with the trash icon.
 
 ### DNS Zones
 
@@ -486,8 +539,13 @@ records. A zone file preview is at the bottom.
 Works inside one domain's site folder (`/var/www/<domain>/`), opening in
 its document root; runs as the account, never follows symlinks out.
 
-- Browse folders, see size and permissions (octal and `rwx`).
-- **Upload** (several files), **Create folder**.
+- Browse folders, see size, age and permissions (octal and `rwx`).
+- **Upload** (several files, by the button or by dropping them on the
+  list), **New folder**, **New file**.
+- **Edit** text files (up to 1 MB, UTF-8) in the browser: line numbers,
+  Tab indents, Ctrl/Cmd+S saves. The file keeps its line endings and
+  permissions, is replaced atomically, and isn't overwritten if something
+  else changed it after it was opened (the typed text is kept).
 - Select several items, then **Download** (one file as-is, otherwise a
   `.zip`), **Compress to .zip** (up to 4 GB), **Move**, **Copy**,
   **Permissions** (file and folder modes, optionally recursive),
@@ -496,8 +554,6 @@ its document root; runs as the account, never follows symlinks out.
   unpacked; refuses links, `..` and absolute paths; overwrites existing
   files), **Rename**, **Download**.
 - Changes clear the domain's static file cache right away.
-
-There is no in-browser file editor.
 
 ### Cron Jobs
 
@@ -571,22 +627,16 @@ Mail, SFTP and panel traffic aren't counted.
 
 Checked against the code; none of these exist today.
 
-- **No "log in as" / impersonation** from WHM into an account's cPanel.
-- **No account editing** - no change of package, email or password for an
-  existing account, and no admin password reset. No "forgot password" on
-  the login page either; two-factor has no recovery codes.
-- **No package editing** - create and delete only. A package can only be
-  deleted once no account uses it, and since an account's package can't
-  be changed yet, a package in use stays until its accounts are removed.
-- **One admin** - only `/setup` creates an admin.
-- **No outgoing notifications** - no welcome email, no quota or
-  suspension emails; the panel sends no mail of its own.
+- **Accounts**: a username or account type can't be changed after creation.
+- **No quota or suspension emails** - the panel emails welcome messages,
+  password resets and server alerts, nothing else yet.
 - **No billing integration** (WHMCS, Blesta, ...) and **no API** for
   external use - every action is a browser form with a CSRF token.
 - **One server** - no clustering, no remote DNS secondaries, no DNSSEC.
 - **No app installer** (WordPress, Softaculous-style).
-- **No in-browser file editor**, no directory password protection (no
-  `htpasswd` UI), no hotlink or IP blocking UI beyond hand-written Routes.
+- No directory password protection (no `htpasswd` UI), no hotlink or IP
+  blocking UI beyond hand-written Routes. The file editor handles UTF-8
+  text up to 1 MB.
 - **No SSH access** for accounts and no shell commands in cron; PHP and
   URL jobs only.
 - **No uploaded SSL certificates** - Let's Encrypt (HTTP-01 through Caddy)

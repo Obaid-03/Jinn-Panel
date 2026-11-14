@@ -94,10 +94,8 @@ conflicting figures, so check it directly.
   One busy site can slow down the others.
 - **Ecosystem.** No billing/WHMCS integration, no external API, no
   one-click app installer, no marketplace.
-- **Account management basics still missing**: WHM can't edit an existing
-  account (change its package, contact email or password) or log in as a
-  customer, there's no "forgot password" or 2FA recovery codes, and no
-  welcome or notification emails yet, and only one admin account.
+- **Notifications are basic**: welcome, password reset and server alert
+  emails, but no quota or suspension notices to customers yet.
 - **No DNSSEC**, no uploaded (custom) certificates, no per-mailbox
   quotas.
 - **More than one server.** No DNS clustering, no multi-server management,
