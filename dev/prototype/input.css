@@ -1,0 +1,267 @@
+/*
+ * Plan 1 v3 prototype stylesheet - the proposed direction, isolated from the
+ * app. Same component class names as app/public/assets/css/input.css, so
+ * the Ui:: helpers render in the new look unchanged. Once approved, this
+ * replaces the app's tokens and components (step 2).
+ *
+ * Direction: an instrument panel. Cool neutral surface levels, one accent
+ * (Jinn violet, from the logo's gradient), IBM Plex Sans for the interface
+ * and Plex Mono for hostnames and paths, digits aligned in columns, charts
+ * as first-class content. Status colours only for status.
+ */
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/ibm-plex-sans-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2"); }
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        color-scheme: light;
+        /* Surface levels: canvas < surface (panels) ; surface-2 (insets, table heads) ; surface-3 (fills, hovers) */
+        --jp-canvas: 242 243 246;
+        --jp-surface: 255 255 255;
+        --jp-surface-2: 247 248 250;
+        --jp-surface-3: 236 238 242;
+        --jp-line: 228 231 236;
+        --jp-line-strong: 205 210 219;
+        --jp-fg: 17 20 27;
+        --jp-muted: 76 83 99;
+        --jp-subtle: 102 112 133;
+
+        --jp-accent: 91 59 232;          /* Jinn violet #5b3be8 - 6.5:1 on white */
+        --jp-accent-hover: 74 43 211;
+        --jp-accent-fg: 255 255 255;
+        --jp-accent-soft: 239 235 254;
+        --jp-accent-text: 78 47 214;
+
+        --jp-success: 5 150 105;
+        --jp-success-soft: 236 253 245;
+        --jp-success-text: 4 120 87;
+        --jp-warning: 217 119 6;
+        --jp-warning-soft: 255 251 235;
+        --jp-warning-text: 180 83 9;
+        --jp-danger: 220 38 38;
+        --jp-danger-soft: 254 242 242;
+        --jp-danger-text: 185 28 28;
+        --jp-info: 2 132 199;
+        --jp-info-soft: 240 249 255;
+        --jp-info-text: 3 105 161;
+
+        /* Chart series, in this order only (validated: CVD-adjacent >= 8, both themes). */
+        --jp-series-1: #5b3be8;
+        --jp-series-2: #eb6834;
+        --jp-series-3: #1baf7a;
+        --jp-series-4: #eda100;
+        --jp-series-other: #b4bac6;
+        --jp-chart-grid: #eceef2;
+        --jp-chart-axis: #cdd2db;
+        --jp-chart-wash: 0.10;
+
+        --jp-shadow-pop: 0 18px 44px -14px rgb(17 20 27 / 0.28), 0 0 0 1px rgb(17 20 27 / 0.06);
+    }
+
+    :root[data-theme="dark"] {
+        color-scheme: dark;
+        --jp-canvas: 11 13 18;
+        --jp-surface: 18 21 28;
+        --jp-surface-2: 23 27 35;
+        --jp-surface-3: 32 37 47;
+        --jp-line: 39 44 55;
+        --jp-line-strong: 54 61 75;
+        --jp-fg: 232 235 241;
+        --jp-muted: 164 171 185;
+        --jp-subtle: 135 144 160;
+
+        --jp-accent: 106 79 240;
+        --jp-accent-hover: 124 100 245;
+        --jp-accent-fg: 255 255 255;
+        --jp-accent-soft: 34 27 69;
+        --jp-accent-text: 185 168 255;
+
+        --jp-success: 16 185 129;
+        --jp-success-soft: 6 42 33;
+        --jp-success-text: 110 231 183;
+        --jp-warning: 245 158 11;
+        --jp-warning-soft: 49 33 8;
+        --jp-warning-text: 252 211 77;
+        --jp-danger: 239 68 68;
+        --jp-danger-soft: 54 16 18;
+        --jp-danger-text: 252 165 165;
+        --jp-info: 14 165 233;
+        --jp-info-soft: 8 36 54;
+        --jp-info-text: 125 211 252;
+
+        --jp-series-1: #7e62f5;
+        --jp-series-2: #d95926;
+        --jp-series-3: #199e70;
+        --jp-series-4: #c98500;
+        --jp-series-other: #4a5263;
+        --jp-chart-grid: #1f2430;
+        --jp-chart-axis: #363d4b;
+        --jp-chart-wash: 0.16;
+
+        --jp-shadow-pop: 0 22px 52px -12px rgb(0 0 0 / 0.65), 0 0 0 1px rgb(255 255 255 / 0.07);
+    }
+
+    html { -webkit-text-size-adjust: 100%; }
+    body { @apply bg-canvas font-sans text-[14px] leading-[1.5] text-fg antialiased; font-feature-settings: "kern"; }
+    ::selection { background: rgb(var(--jp-accent) / 0.22); }
+    :focus-visible { outline: 2px solid rgb(var(--jp-accent)); outline-offset: 2px; }
+    input[type="checkbox"], input[type="radio"] { accent-color: rgb(var(--jp-accent)); }
+    code, kbd, .mono { font-family: theme("fontFamily.mono"); }
+    [hidden] { display: none !important; }
+    .js .js-hide { display: none !important; }
+    /* Columns of figures line up; big standalone figures keep proportional digits. */
+    .num, td, th { font-variant-numeric: tabular-nums; }
+}
+
+@layer components {
+    /* Layout */
+    .page { @apply mx-auto w-full max-w-[84rem]; }
+    .page-title { @apply text-[1.375rem] font-semibold leading-tight tracking-[-0.01em] text-fg; }
+    .page-desc { @apply mt-1 text-sm text-muted; }
+    .stack { @apply space-y-6; }
+    .section-title { @apply text-[13px] font-medium text-muted; }
+
+    /* Panels: one surface, hairline dividers inside (an instrument cluster, not a pile of cards). */
+    .card, .panel { @apply rounded-[12px] border border-line bg-surface; }
+    .panel-row { @apply grid divide-y divide-line sm:divide-x sm:divide-y-0; }
+    .card-header { @apply flex flex-wrap items-start justify-between gap-3 px-5 pb-3 pt-4; }
+    .card-title { @apply text-[15px] font-semibold text-fg; }
+    .card-desc { @apply mt-0.5 text-[13px] text-muted; }
+    .card-body { @apply px-5 pb-5 pt-1; }
+    .card-footer { @apply flex flex-wrap items-center justify-end gap-2 rounded-b-[12px] border-t border-line px-5 py-3; }
+    a.card-link { @apply transition-colors hover:border-line-strong; }
+
+    /* Buttons */
+    .btn { @apply inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-[8px] px-3.5 text-[13.5px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50; }
+    .btn > svg { @apply h-4 w-4 shrink-0; }
+    .btn-primary { @apply bg-accent text-accent-fg hover:bg-accent-hover; }
+    .btn-secondary { @apply border border-line-strong bg-surface text-fg hover:bg-surface-2; }
+    .btn-ghost { @apply text-muted hover:bg-surface-3 hover:text-fg; }
+    .btn-danger { @apply bg-danger text-white hover:bg-danger/90; }
+    .btn-danger-ghost { @apply text-danger-text hover:bg-danger-soft; }
+    .btn-sm { @apply h-8 gap-1.5 px-2.5 text-[12.5px]; }
+    .btn-sm > svg { @apply h-3.5 w-3.5; }
+    .btn-icon { @apply h-9 w-9 p-0 text-muted hover:bg-surface-3 hover:text-fg; }
+    .btn-block { @apply w-full; }
+
+    /* Forms */
+    .field { @apply min-w-0; }
+    .label { @apply mb-1.5 block text-[13px] font-medium text-fg; }
+    .label-optional { @apply font-normal text-subtle; }
+    .input, .select, .textarea {
+        @apply block h-10 w-full rounded-[8px] border border-line-strong bg-surface px-3 text-[14px] text-fg
+               transition-colors placeholder:text-subtle focus:border-accent focus:outline-none focus:ring-[3px] focus:ring-accent/20;
+    }
+    .textarea { @apply h-auto min-h-[6rem] py-2; }
+    .select {
+        @apply appearance-none pr-9;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23667085'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z' clip-rule='evenodd'/%3E%3C/svg%3E");
+        background-position: right 0.6rem center; background-repeat: no-repeat; background-size: 1.1rem;
+    }
+    .input-sm, .select-sm { @apply h-8 px-2.5 text-[13px]; }
+    .select-sm { @apply pr-8; }
+    .hint { @apply mt-1.5 text-[12.5px] text-muted; }
+    .field-error { @apply mt-1.5 text-[12.5px] font-medium text-danger-text; }
+    .check { @apply flex items-start gap-2.5 text-sm text-fg; }
+    .check > input { @apply mt-0.5 h-4 w-4 shrink-0; }
+
+    /* Segmented control (ranges, filters) */
+    .segmented { @apply inline-flex max-w-full overflow-x-auto rounded-[9px] border border-line bg-surface-2 p-0.5; }
+    .segmented > a, .segmented > button { @apply whitespace-nowrap rounded-[7px] px-2.5 py-1 text-[12.5px] font-medium text-muted hover:text-fg; }
+    .segmented > [aria-current="true"], .segmented > [aria-pressed="true"] { @apply bg-surface text-fg shadow-[0_1px_2px_rgb(17_20_27/0.08)] ring-1 ring-line; }
+
+    /* Badges: status words, never decoration */
+    .badge { @apply inline-flex h-[22px] items-center gap-1.5 whitespace-nowrap rounded-[6px] px-2 text-[12px] font-medium; }
+    .badge-neutral { @apply bg-surface-3 text-muted; }
+    .badge-accent { @apply bg-accent-soft text-accent-text; }
+    .badge-success { @apply bg-success-soft text-success-text; }
+    .badge-warning { @apply bg-warning-soft text-warning-text; }
+    .badge-danger { @apply bg-danger-soft text-danger-text; }
+    .badge-info { @apply bg-info-soft text-info-text; }
+    .dot { @apply inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-current; }
+
+    .alert { @apply flex items-start gap-3 rounded-[10px] border px-4 py-3 text-sm; }
+    .alert > svg { @apply mt-0.5 h-4 w-4 shrink-0; }
+    .alert-info { @apply border-info/25 bg-info-soft text-info-text; }
+    .alert-warning { @apply border-warning/30 bg-warning-soft text-warning-text; }
+    .alert-danger { @apply border-danger/25 bg-danger-soft text-danger-text; }
+
+    /* Tables */
+    .table-wrap { @apply overflow-x-auto; }
+    .table { @apply w-full text-left text-[13.5px]; }
+    .table thead th { @apply whitespace-nowrap border-y border-line bg-surface-2 px-4 py-2 text-[12.5px] font-medium text-muted first:pl-5 last:pr-5; }
+    .table tbody td { @apply px-4 py-3 align-middle first:pl-5 last:pr-5; }
+    .table tbody tr { @apply border-b border-line last:border-b-0; }
+    .table tbody tr:hover { @apply bg-surface-2; }
+    .th-sort { @apply inline-flex items-center gap-1 hover:text-fg; }
+    th[aria-sort] > .th-sort { @apply text-fg; }
+
+    /* Meters */
+    .progress { @apply h-1.5 w-full overflow-hidden rounded-full bg-accent/15; }
+    .progress-bar { @apply h-full rounded-full bg-accent; }
+    .progress-bar-warning { @apply bg-warning; }
+    .progress-bar-danger { @apply bg-danger; }
+
+    .link { @apply font-medium text-accent-text underline-offset-2 hover:underline; }
+    .kbd { @apply inline-flex items-center rounded-[5px] border border-line bg-surface px-1.5 font-mono text-[11px] leading-5 text-subtle; }
+    .chip { @apply inline-flex items-center rounded-[6px] bg-surface-3 px-2 py-0.5 font-mono text-[12px] text-fg; }
+
+    .empty { @apply flex flex-col items-center justify-center px-6 py-10 text-center; }
+    .empty-title { @apply text-sm font-semibold text-fg; }
+    .empty-text { @apply mt-1 max-w-sm text-sm text-muted; }
+
+    /* Figures */
+    .figure { @apply text-[28px] font-semibold leading-none tracking-[-0.02em] text-fg; }
+    .figure-sm { @apply text-[20px] font-semibold leading-none tracking-[-0.01em] text-fg; }
+    .delta-up { @apply text-success-text; }
+    .delta-down { @apply text-danger-text; }
+
+    /* Shell */
+    .skip-link { @apply sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2 focus:shadow-pop; }
+    .nav-section { @apply px-3 pb-1 pt-5 text-[12px] font-medium text-subtle; }
+    .nav-link { @apply flex h-9 items-center gap-3 rounded-[8px] px-3 text-[13.5px] font-medium text-muted transition-colors hover:bg-surface-3 hover:text-fg; }
+    .nav-link > svg { @apply h-[18px] w-[18px] shrink-0; }
+    .nav-link[aria-current="page"] { @apply bg-surface text-fg shadow-[0_1px_2px_rgb(17_20_27/0.06)] ring-1 ring-line; }
+    .nav-link[aria-current="page"] > svg { @apply text-accent; }
+
+    /* Charts (Chart.php) */
+    .chart { @apply relative; }
+    .chart-plot { @apply absolute; }
+    .chart-grid { @apply pointer-events-none absolute inset-x-0 border-t; border-color: var(--jp-chart-grid); }
+    .chart-base { @apply pointer-events-none absolute inset-x-0 border-t; border-color: var(--jp-chart-axis); }
+    .chart-ytick { @apply pointer-events-none absolute -translate-y-1/2 pr-2 text-right text-[11.5px] text-subtle; font-variant-numeric: tabular-nums; }
+    .chart-xtick { @apply pointer-events-none absolute -translate-x-1/2 whitespace-nowrap pt-2 text-[11.5px] text-subtle; font-variant-numeric: tabular-nums; }
+    .chart-cross { @apply pointer-events-none absolute inset-y-0 w-px bg-fg/25; }
+    .chart-tip { @apply pointer-events-none absolute z-20 min-w-[9rem] rounded-[10px] border border-line bg-surface px-3 py-2 text-[12.5px] shadow-pop; }
+    .chart-tip-row { @apply flex items-center justify-between gap-4; }
+    .chart-key { @apply inline-block h-0.5 w-3 shrink-0 rounded-full; }
+    .chart-swatch { @apply inline-block h-2.5 w-2.5 shrink-0 rounded-[3px]; }
+    .chart-col { @apply flex h-full flex-1 flex-col-reverse items-center outline-none; }
+    .chart-col > span { @apply block w-full max-w-[24px] first:rounded-b-none; }
+    .chart-col > span + span { margin-bottom: 2px; }
+    .chart-col > span:last-child { @apply rounded-t-[4px]; }
+    .chart-col:hover > span, .chart-col:focus-visible > span { filter: brightness(1.08); }
+    .chart-col:focus-visible { @apply rounded-[4px] ring-2 ring-accent; }
+    .chart-col[data-active] > span { filter: brightness(1.12); }
+}
+
+/* Series colours sit outside @layer: they come from data (s1..s4, so), and
+   Tailwind would drop layered classes it can't find in a template. */
+.s1 { background: var(--jp-series-1); }
+.s2 { background: var(--jp-series-2); }
+.s3 { background: var(--jp-series-3); }
+.s4 { background: var(--jp-series-4); }
+.so { background: var(--jp-series-other); }
+
+@keyframes jp-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.chart-tip { animation: jp-in .12s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+}
