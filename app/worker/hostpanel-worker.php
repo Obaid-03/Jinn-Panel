@@ -1819,6 +1819,7 @@ function startUnit(string $unit, string $description, array $args): void
 /** Things that run on their own schedule rather than as jobs. */
 function periodicTasks(): void
 {
+    statsDue();
     $stamp = OUT_DIR . '/.periodic-hourly';
     if (is_file($stamp) && filemtime($stamp) > time() - 3600) {
         return;
@@ -1838,6 +1839,44 @@ function periodicTasks(): void
         alertsDue();
     } catch (Throwable $e) {
         writeOut('worker-periodic.log', '[' . date('c') . '] alerts: ' . $e->getMessage() . "\n", true);
+    }
+}
+
+/**
+ * Statistics (StatsCollector): the server and its services every minute,
+ * the web access log every 5 minutes (sooner while there is a backlog),
+ * old rows and yesterday's visitor salt after 03:00 each night.
+ */
+function statsDue(): void
+{
+    $log = function (string $m): void {
+        $file = OUT_DIR . '/worker-stats.log';
+        if (@filesize($file) > 1048576) {
+            @rename($file, $file . '.1');
+        }
+        writeOut('worker-stats.log', '[' . date('c') . "] $m\n", true);
+    };
+    $due = fn(string $name, int $every) => !is_file(OUT_DIR . "/.periodic-$name") || filemtime(OUT_DIR . "/.periodic-$name") <= time() - $every;
+    try {
+        if ($due('minute', 55)) {
+            touch(OUT_DIR . '/.periodic-minute');
+            panelClasses();
+            StatsCollector::sample($log);
+        }
+        if ($due('5min', 295)) {
+            panelClasses();
+            if (!StatsCollector::ingest($log, 20.0)['more']) {
+                touch(OUT_DIR . '/.periodic-5min');
+            }
+        }
+        $today = date('Y-m-d');
+        if ((int) date('G') >= 3 && @file_get_contents(OUT_DIR . '/.periodic-daily') !== $today) {
+            file_put_contents(OUT_DIR . '/.periodic-daily', $today);
+            panelClasses();
+            StatsCollector::prune($log);
+        }
+    } catch (Throwable $e) {
+        $log('FAILED: ' . $e->getMessage());
     }
 }
 

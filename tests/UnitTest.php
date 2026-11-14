@@ -410,6 +410,59 @@ function test_chart_markup(): void
     T::ok(!str_contains(Chart::columns([['name' => 'a']], [[1], [2]], ['x', 'y'], 'one series'), 'Total'), 'one series: no total');
 }
 
+function test_access_log_stats(): void
+{
+    $hashes = [];
+    $agg = new AccessLogStats(['acme.test' => 1, 'www.acme.test' => 1, 'acme.example' => 1, 'bakery.test' => 2], function (string $ip, string $ua, string $day) use (&$hashes): string {
+        $hashes[] = $ip;
+        return substr(hash('sha256', "salt|$ip|$ua", true), 0, 8);
+    });
+    $line = fn(array $e) => json_encode($e + ['ts' => 1763100000.5, 'status' => 200, 'size' => 1000, 'duration' => 0.25]);
+    $req = fn(string $host, string $uri, array $h = [], string $type = 'text/html; charset=utf-8') => [
+        'request' => ['host' => $host, 'uri' => $uri, 'method' => 'GET', 'client_ip' => '203.0.113.9', 'headers' => $h + ['User-Agent' => ['Mozilla/5.0 Firefox']]],
+        'resp_headers' => $type === '' ? [] : ['Content-Type' => [$type]],
+    ];
+    T::ok($agg->add($line($req('www.acme.test', '/shop?utm=1', ['Referer' => ['https://www.google.com/search']]))), 'www. counts for the domain');
+    T::ok($agg->add($line($req('acme.example:443', '/shop'))), 'an alias with a port');
+    T::ok($agg->add($line($req('acme.test', '/app.css', [], ''))), 'a file');
+    T::ok($agg->add($line(['status' => 404] + $req('acme.test', '/wp-login.php'))), '404 page');
+    T::ok($agg->add($line(['status' => 503, 'duration' => 2.5] + $req('acme.test', '/slow'))), 'slow 5xx');
+    T::ok($agg->add($line($req('acme.test', '/', ['User-Agent' => ['Googlebot/2.1'], 'Referer' => ['https://acme.test/about']]))), 'bot from its own site');
+    T::ok(!$agg->add($line($req('other.test', '/'))), 'unknown host skipped');
+    T::ok(!$agg->add('not json'), 'garbage skipped');
+    T::same(8, $agg->lines, 'lines seen');
+    T::same(6, $agg->counted, 'lines counted');
+
+    $hour = array_values($agg->hourly()[1])[0];
+    T::same(6, $hour['requests'], 'requests');
+    T::same(5, $hour['pages'], 'pages: not the .css');
+    T::same([4, 0, 1, 1], [$hour['s2xx'], $hour['s3xx'], $hour['s4xx'], $hour['s5xx']], 'status classes');
+    T::same(1, $hour['slow'], 'one page over a second');
+    T::same(250 * 4 + 2500, $hour['time_ms'], 'page time summed');
+    T::same(6000, $agg->bytes()[1], 'bytes for bandwidth');
+    $top = $agg->top()[1][date('Y-m-d', 1763100000)];
+    T::same(['/shop' => 2, '/' => 1], $top['page'], 'top pages: query dropped, errors left out');
+    T::same(['google.com' => 1], $top['referrer'], 'referrer host without www., own site left out');
+    $visitors = $agg->visitors()[1][date('Y-m-d', 1763100000)];
+    T::same(1, count($visitors), 'the same browser is one visitor; bots are none');
+    T::ok(!in_array('203.0.113.9', array_map('strval', array_keys($visitors)), true), 'no address kept');
+
+    T::same('/a b', AccessLogStats::path('/a%20b?x=1#y'), 'path decoded, query dropped');
+    T::same(190, mb_strlen(AccessLogStats::path('/' . str_repeat('x', 300))), 'path capped');
+    T::same('', AccessLogStats::referrer('android-app://com.x'), 'not a web referrer');
+    T::same(250, AccessLogStats::durationMs(0.25), 'seconds');
+    T::same(13, AccessLogStats::durationMs('12.5ms'), 'string');
+    T::same(1500, AccessLogStats::durationMs(1500000000), 'nanoseconds');
+
+    $many = new AccessLogStats(['a.test' => 1], fn() => '12345678');
+    for ($i = 0; $i < 5; $i++) {
+        $many->add($line($req('a.test', "/p$i")));
+    }
+    $t = $many->top(3)[1][date('Y-m-d', 1763100000)]['page'];
+    T::same(4, count($t), 'kept 3 + (other)');
+    T::same(2, $t[AccessLogStats::OTHER] ?? 0, 'the rest under (other)');
+}
+
 // ---------------------------------------------------------------------------
 
 $filter = $argv[1] ?? '';

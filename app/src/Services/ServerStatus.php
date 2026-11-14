@@ -10,7 +10,7 @@ final class ServerStatus
      * query systemd over D-Bus. "Can it serve a request" is the more useful
      * signal anyway, and a plain TCP connect needs no privileges.
      */
-    private const SERVICES = [
+    public const SERVICES = [
         'mariadb' => 3306,
         'frankenphp' => 443,
         'stalwart' => 8080,
@@ -36,6 +36,16 @@ final class ServerStatus
      * @return array{disk_total:int, disk_used:int, mem_total:int, mem_used:int, load:array<int,float>, cpus:int, uptime:int, services:array<string,string>}
      */
     public static function stats(): array
+    {
+        return self::machine() + ['services' => self::services()];
+    }
+
+    /**
+     * Disk, memory, load, CPUs and uptime (no service checks).
+     *
+     * @return array{disk_total:int, disk_used:int, mem_total:int, mem_used:int, load:array<int,float>, cpus:int, uptime:int}
+     */
+    public static function machine(): array
     {
         $diskTotal = (int) (@disk_total_space('/') ?: 0);
         $diskFree = (int) (@disk_free_space('/') ?: 0);
@@ -65,7 +75,6 @@ final class ServerStatus
             'load' => function_exists('sys_getloadavg') ? (sys_getloadavg() ?: [0, 0, 0]) : [0, 0, 0],
             'cpus' => max(1, $cpus),
             'uptime' => $uptime,
-            'services' => self::services(),
         ];
     }
 }

@@ -5,7 +5,9 @@ declare(strict_types=1);
  * Measures what each hosting account uses, hourly (run as root by
  * hostpanel-worker): disk = its site folders + its databases + its
  * mailboxes, and bandwidth = bytes its sites served this month, from the
- * web server's access log. Results go to account_usage; Quota reads them.
+ * web server's access log (StatsCollector reads it). Results go to
+ * account_usage, which Quota reads, and each day's disk use to
+ * stat_account_daily for the history charts.
  *
  * Over the disk quota, the panel refuses anything that adds data (uploads,
  * extracting, new databases/mailboxes/domains). With XFS user quotas on
@@ -16,14 +18,19 @@ declare(strict_types=1);
  */
 final class UsageService
 {
-    public const ACCESS_LOG = '/var/log/jinnpanel-web/access.log'; // written by Caddy (frankenphp)
-    private const STATE = '/var/lib/jinnpanel/worker/.access-log-offset';
+    public const ACCESS_LOG = '/var/log/jinnpanel-web/access.log'; // written by Caddy (frankenphp), read by StatsCollector
 
     public static function refresh(callable $log): void
     {
         $pdo = Database::app();
         $month = date('Y-m');
-        $bandwidth = self::bandwidthSinceLastRun($log);
+        // Read the access log first, so the month's bandwidth is as fresh as it can be.
+        try {
+            StatsCollector::ingest($log);
+        } catch (Throwable $e) {
+            $log('statistics: ' . $e->getMessage());
+        }
+        $bandwidth = StatsCollector::takeBandwidth();
         $xfs = self::xfsQuotaOn();
 
         foreach ($pdo->query("SELECT u.id, u.username, p.disk_quota_mb, p.bandwidth_mb FROM users u LEFT JOIN packages p ON p.id = u.package_id WHERE u.role = 'user'")->fetchAll() as $u) {
@@ -39,6 +46,11 @@ final class UsageService
             $files += self::du(AccountRuntime::HOME . '/' . $u['username']);
             $db = self::databaseBytes($id);
             $mail = self::mailBytes($id);
+            try {
+                StatsCollector::recordDisk($id, $files, $db, $mail);
+            } catch (Throwable $e) {
+                $log("{$u['username']}: disk history: " . $e->getMessage());
+            }
 
             $cur = $pdo->prepare('SELECT * FROM account_usage WHERE user_id = ?');
             $cur->execute([$id]);
@@ -121,53 +133,6 @@ final class UsageService
             error_log('mail usage: ' . $e->getMessage());
             return 0;
         }
-    }
-
-    /**
-     * Response bytes per host since the last run, from the JSON access log
-     * every site writes (VhostService). Remembers where it stopped; starts
-     * over when the log was rotated.
-     *
-     * @return array<string,int> domain (www. and aliases folded in) => bytes
-     */
-    private static function bandwidthSinceLastRun(callable $log): array
-    {
-        if (!is_file(self::ACCESS_LOG)) {
-            return [];
-        }
-        $state = json_decode((string) @file_get_contents(self::STATE), true) ?: [];
-        $ino = (int) fileinode(self::ACCESS_LOG);
-        $offset = ((int) ($state['ino'] ?? 0) === $ino) ? (int) ($state['offset'] ?? 0) : 0;
-        if ($offset > (int) filesize(self::ACCESS_LOG)) {
-            $offset = 0;
-        }
-        $aliases = [];
-        foreach (Database::app()->query('SELECT a.alias_name, d.domain_name FROM domain_aliases a JOIN domains d ON d.id = a.domain_id')->fetchAll() as $a) {
-            $aliases[strtolower((string) $a['alias_name'])] = strtolower((string) $a['domain_name']);
-        }
-        $fh = fopen(self::ACCESS_LOG, 'rb');
-        fseek($fh, $offset);
-        $bytes = [];
-        $lines = 0;
-        while (($line = fgets($fh)) !== false) {
-            if (!str_ends_with($line, "\n")) {
-                break; // being written - next run
-            }
-            $offset += strlen($line);
-            $lines++;
-            $e = json_decode($line, true);
-            if (!is_array($e)) {
-                continue;
-            }
-            $host = strtolower(preg_replace('/:\d+$/', '', (string) ($e['request']['host'] ?? '')));
-            $host = str_starts_with($host, 'www.') ? substr($host, 4) : $host;
-            $host = $aliases[$host] ?? $host;
-            $bytes[$host] = ($bytes[$host] ?? 0) + (int) ($e['size'] ?? 0);
-        }
-        fclose($fh);
-        file_put_contents(self::STATE, json_encode(['ino' => $ino, 'offset' => $offset]));
-        $log("access log: $lines request(s) counted");
-        return $bytes;
     }
 
     /** Whether / has XFS user quotas switched on (rootflags=uquota). */
