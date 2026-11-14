@@ -1,83 +1,85 @@
-<div class="flex items-center justify-between mb-4">
-    <p class="text-sm text-slate-500"><?= count($accounts) ?> account<?= count($accounts) === 1 ? '' : 's' ?></p>
-    <a href="/whm/accounts/create" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 transition-colors">
-        <?= icon('plus', 'h-4 w-4') ?> Create account
-    </a>
-</div>
-
-<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-    <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-        <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-            <tr>
-                <th class="text-left font-medium px-5 py-3">Username</th>
-                <th class="text-left font-medium px-5 py-3">Role</th>
-                <?php if ($me['role'] === 'admin'): ?><th class="text-left font-medium px-5 py-3">Reseller</th><?php endif; ?>
-                <th class="text-left font-medium px-5 py-3">Package</th>
-                <th class="text-left font-medium px-5 py-3">Status</th>
-                <th class="text-right font-medium px-5 py-3">Actions</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-            <?php foreach ($accounts as $a): ?>
-            <tr class="hover:bg-slate-50/70">
-                <td class="px-5 py-3">
-                    <p class="font-medium text-slate-800"><?= e($a['username']) ?></p>
-                    <p class="text-xs text-slate-400"><?= e($a['email']) ?></p>
-                </td>
-                <td class="px-5 py-3">
-                    <span class="inline-flex text-xs font-medium capitalize rounded-full px-2 py-0.5 <?= $a['role'] === 'reseller' ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-600' ?>">
-                        <?= e($a['role']) ?>
-                    </span>
-                </td>
-                <?php if ($me['role'] === 'admin'): ?>
-                <td class="px-5 py-3 text-slate-500"><?= e($a['reseller_username'] ?? '—') ?></td>
-                <?php endif; ?>
-                <td class="px-5 py-3 text-slate-600"><?= e($a['package_name'] ?? '—') ?></td>
-                <td class="px-5 py-3">
-                    <span class="inline-flex items-center gap-1.5 text-xs font-medium <?= $a['status'] === 'active' ? 'text-emerald-700' : 'text-amber-700' ?>">
-                        <span class="h-1.5 w-1.5 rounded-full <?= $a['status'] === 'active' ? 'bg-emerald-500' : 'bg-amber-500' ?>"></span>
-                        <?= e($a['status']) ?>
-                    </span>
-                </td>
-                <td class="px-5 py-3">
-                    <div class="flex justify-end items-center gap-1">
-                        <?php if ($me['role'] === 'admin' && $a['role'] === 'user'): ?>
-                        <form method="post" action="/whm/accounts/<?= (int) $a['id'] ?>/php-exec" data-confirm="<?= (int) $a['php_exec'] ? 'Stop ' . e($a['username']) . '\'s PHP from running programs?' : 'Let ' . e($a['username']) . '\'s PHP run programs (exec, proc_open...)? Only for software that needs it.' ?>">
-                            <?= Csrf::field() ?>
-                            <input type="hidden" name="allow" value="<?= (int) $a['php_exec'] ? '' : '1' ?>">
-                            <button class="text-[11px] font-medium rounded-full px-2 py-0.5 <?= (int) $a['php_exec'] ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500 hover:text-slate-700' ?>" title="Whether this account's PHP may run programs">exec <?= (int) $a['php_exec'] ? 'on' : 'off' ?></button>
-                        </form>
-                        <?php endif; ?>
-                        <?php if ($me['role'] === 'admin' && !empty($a['totp_secret_enc'])): ?>
-                        <form method="post" action="/whm/accounts/<?= (int) $a['id'] ?>/reset-2fa" data-confirm="Turn off two-factor sign-in for <?= e($a['username']) ?> (e.g. a lost phone)?">
-                            <?= Csrf::field() ?>
-                            <button class="text-[11px] font-medium rounded-full px-2 py-0.5 bg-emerald-50 text-emerald-700" title="Two-factor is on - click to reset it">2FA</button>
-                        </form>
-                        <?php endif; ?>
-                        <?php if ($a['status'] === 'active'): ?>
-                        <form method="post" action="/whm/accounts/<?= (int) $a['id'] ?>/suspend" data-confirm="Suspend <?= e($a['username']) ?>? Its sites go offline (503), and its mail logins, SFTP, MySQL users and cron jobs stop until it's unsuspended.">
-                            <?= Csrf::field() ?>
-                            <button class="p-2 rounded-md text-slate-400 hover:text-amber-600 hover:bg-amber-50" title="Suspend"><?= icon('pause', 'h-4 w-4') ?></button>
-                        </form>
-                        <?php else: ?>
-                        <form method="post" action="/whm/accounts/<?= (int) $a['id'] ?>/unsuspend">
-                            <?= Csrf::field() ?>
-                            <button class="p-2 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50" title="Unsuspend"><?= icon('play', 'h-4 w-4') ?></button>
-                        </form>
-                        <?php endif; ?>
-                        <form method="post" action="/whm/accounts/<?= (int) $a['id'] ?>/delete" data-confirm="Permanently delete <?= e($a['username']) ?> and all of its domains, databases, mailboxes and FTP accounts? Its site files are moved to /var/lib/jinnpanel/removed/ (root only).">
-                            <?= Csrf::field() ?>
-                            <button class="p-2 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50" title="Delete"><?= icon('trash', 'h-4 w-4') ?></button>
-                        </form>
-                    </div>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-            <?php if (!$accounts): ?>
-            <tr><td colspan="6" class="px-5 py-10 text-center text-slate-400">No accounts yet.</td></tr>
-            <?php endif; ?>
-        </tbody>
-    </table>
+<?php
+/** @var list<array<string,mixed>> $accounts with package_name, reseller_username, used_bytes, over_disk, over_bandwidth, domain_count */
+/** @var array<string,mixed> $me */
+$admin = $me['role'] === 'admin';
+View::slot('desc', e($admin ? 'Every login on this server: administrators, resellers and hosting accounts.' : 'The hosting accounts you created.'));
+View::slot('actions', '<a href="/whm/accounts/create" class="btn btn-primary">' . icon('user-plus') . 'Create account</a>');
+$roleBadge = fn(string $r) => match ($r) {
+    'admin' => Ui::badge('Admin', 'accent'),
+    'reseller' => Ui::badge('Reseller', 'info'),
+    default => '',
+};
+?>
+<section class="card" aria-labelledby="accounts-title">
+    <div class="card-header">
+        <h2 id="accounts-title" class="card-title"><?= e(Ui::plural(count($accounts), 'account')) ?></h2>
+        <?php if (count($accounts) > 6): ?>
+        <input type="search" class="input input-sm w-full sm:w-64" placeholder="Filter by name, email, package…" aria-label="Filter accounts" data-filter="#accounts-table">
+        <?php endif; ?>
     </div>
-</div>
+    <div class="table-wrap">
+        <table class="table" id="accounts-table">
+            <thead>
+                <tr>
+                    <th scope="col">Account</th>
+                    <th scope="col" class="hidden md:table-cell">Package</th>
+                    <?php if ($admin): ?><th scope="col" class="hidden lg:table-cell">Reseller</th><?php endif; ?>
+                    <th scope="col" class="hidden sm:table-cell">Usage</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" class="text-right"><span class="sr-only">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($accounts as $a): $id = (int) $a['id']; $self = $id === (int) $me['id']; ?>
+                <tr>
+                    <td class="max-w-[18rem]">
+                        <div class="flex items-center gap-3">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-3 text-xs font-semibold uppercase text-muted" aria-hidden="true"><?= e(substr((string) $a['username'], 0, 2)) ?></span>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <?php if ($self): ?>
+                                    <span class="truncate font-medium text-fg"><?= e($a['username']) ?></span> <?= Ui::badge('You', 'neutral') ?>
+                                    <?php else: ?>
+                                    <a href="/whm/accounts/<?= $id ?>" class="truncate font-medium text-fg hover:text-accent-text"><?= e($a['username']) ?></a>
+                                    <?php endif; ?>
+                                    <?= $roleBadge((string) $a['role']) ?>
+                                </div>
+                                <p class="truncate text-xs text-muted"><?= e($a['email']) ?></p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="hidden text-muted md:table-cell"><?= e($a['package_name'] ?? '—') ?></td>
+                    <?php if ($admin): ?><td class="hidden text-muted lg:table-cell"><?= e($a['reseller_username'] ?? '—') ?></td><?php endif; ?>
+                    <td class="hidden whitespace-nowrap sm:table-cell">
+                        <?php if ($a['role'] === 'user'): ?>
+                        <span class="tabular-nums text-fg"><?= e(fmt_bytes((int) ($a['used_bytes'] ?? 0))) ?></span>
+                        <span class="text-muted">· <?= e(Ui::plural((int) $a['domain_count'], 'domain')) ?></span>
+                        <?php if (!empty($a['over_disk']) || !empty($a['over_bandwidth'])): ?>
+                        <div class="mt-1"><?= Ui::badge(!empty($a['over_disk']) ? 'Over disk quota' : 'Bandwidth used up', 'danger') ?></div>
+                        <?php endif; ?>
+                        <?php else: ?>
+                        <span class="text-subtle">—</span>
+                        <?php endif; ?>
+                    </td>
+                    <td><?= Ui::status((string) $a['status']) ?></td>
+                    <td>
+                        <?php if (!$self): ?>
+                        <div class="flex items-center justify-end gap-1">
+                            <?php if ($a['role'] === 'user' && $a['status'] === 'active'): ?>
+                            <?= Ui::actionForm("/whm/accounts/$id/login-as", 'login', 'Log in as ' . $a['username']) ?>
+                            <?php endif; ?>
+                            <a href="/whm/accounts/<?= $id ?>" class="btn btn-secondary btn-sm">Manage</a>
+                        </div>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                <?php if (!$accounts): ?>
+                <?= Ui::emptyRow($admin ? 6 : 5, 'No accounts yet', 'Create a hosting account for a customer, or a reseller who creates their own.', 'users', '<a href="/whm/accounts/create" class="btn btn-primary">' . icon('user-plus') . 'Create account</a>') ?>
+                <?php else: ?>
+                <tr data-filter-none data-filter-skip hidden><td colspan="<?= $admin ? 6 : 5 ?>" class="py-8 text-center text-sm text-muted">No account matches that filter.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</section>

@@ -1,56 +1,51 @@
-<div class="max-w-lg">
-<div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-    <form method="post" action="/whm/packages" class="space-y-4">
-        <?= Csrf::field() ?>
-        <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1.5">Package name</label>
-            <input type="text" name="name" required
-                   class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-        </div>
-        <div class="grid grid-cols-2 gap-4">
+<?php
+/** @var array<string,mixed>|null $pkg null = create */
+/** @var int $accounts accounts using it */
+$edit = $pkg !== null;
+View::breadcrumbs([['Packages', '/whm/packages'], [$edit ? (string) $pkg['name'] : 'Create package']]);
+View::slot('desc', e($edit
+    ? 'Changes apply to every account on this package. Lowering a limit deletes nothing; accounts over it just can\'t add more.'
+    : 'A set of limits for hosting accounts. Disk and bandwidth are enforced; counts limit what can be created.'));
+$v = fn(string $k, int $default) => $edit ? (string) (int) $pkg[$k] : (string) $default;
+$num = fn(int $min) => ['min' => $min, 'inputmode' => 'numeric', 'class' => 'tabular-nums'];
+?>
+<form method="post" action="<?= $edit ? '/whm/packages/' . (int) $pkg['id'] : '/whm/packages' ?>" class="max-w-3xl">
+    <?= Csrf::field() ?>
+    <div class="card">
+        <?php if ($edit && $accounts > 0): ?>
+        <div class="card-body border-b border-line pb-4"><?= Ui::alert('Used by ' . Ui::plural($accounts, 'account') . '. Saving changes their limits right away (hard disk quotas within the hour).', 'info') ?></div>
+        <?php endif; ?>
+        <div class="card-body space-y-6">
+            <?= Ui::field('name', 'Package name', ['required' => true, 'value' => $edit ? (string) $pkg['name'] : null, 'placeholder' => 'Business', 'wrap' => 'max-w-sm']) ?>
+
             <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1.5">Disk quota (MB)</label>
-                <input type="number" name="disk_quota_mb" value="1024" min="1"
-                       class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <h2 class="section-title mb-3">Resources</h2>
+                <div class="grid gap-5 sm:grid-cols-2">
+                    <?= Ui::field('disk_quota_mb', 'Disk space', ['type' => 'number', 'value' => $v('disk_quota_mb', 1024), 'suffix' => 'MB', 'hint' => 'Files, databases and mail together. 1024 MB = 1 GB.', 'attrs' => $num(1)]) ?>
+                    <?= Ui::field('bandwidth_mb', 'Bandwidth per month', ['type' => 'number', 'value' => $v('bandwidth_mb', 10240), 'suffix' => 'MB', 'hint' => 'Over it, the account\'s sites answer 509 until next month.', 'attrs' => $num(1)]) ?>
+                </div>
             </div>
+
             <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1.5">Bandwidth (MB/mo)</label>
-                <input type="number" name="bandwidth_mb" value="10240" min="1"
-                       class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <h2 class="section-title mb-3">Limits</h2>
+                <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                    <?= Ui::field('max_domains', 'Domains', ['type' => 'number', 'value' => $v('max_domains', 1), 'attrs' => $num(1)]) ?>
+                    <?= Ui::field('max_databases', 'Databases', ['type' => 'number', 'value' => $v('max_databases', 1), 'attrs' => $num(1)]) ?>
+                    <?= Ui::field('max_email_accounts', 'Mailboxes', ['type' => 'number', 'value' => $v('max_email_accounts', 5), 'attrs' => $num(0)]) ?>
+                    <?= Ui::field('max_ftp_accounts', 'SFTP logins', ['type' => 'number', 'value' => $v('max_ftp_accounts', 1), 'attrs' => $num(0)]) ?>
+                </div>
             </div>
-            <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1.5">Max domains</label>
-                <input type="number" name="max_domains" value="1" min="1"
-                       class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1.5">Max databases</label>
-                <input type="number" name="max_databases" value="1" min="1"
-                       class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1.5">Max email accounts</label>
-                <input type="number" name="max_email_accounts" value="5" min="0"
-                       class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1.5">Max FTP accounts</label>
-                <input type="number" name="max_ftp_accounts" value="1" min="0"
-                       class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            </div>
+
             <?php if (Auth::isAdmin()): ?>
             <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1.5">Max accounts (for resellers)</label>
-                <input type="number" name="max_accounts" value="0" min="0"
-                       class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                <p class="mt-1 text-[11px] text-slate-400">How many accounts a reseller on this package may create (0 = none).</p>
+                <h2 class="section-title mb-3">Resellers</h2>
+                <?= Ui::field('max_accounts', 'Accounts a reseller on this package may create', ['type' => 'number', 'value' => $v('max_accounts', 0), 'hint' => '0 = none. Only matters when the package is given to a reseller.', 'wrap' => 'max-w-sm', 'attrs' => $num(0)]) ?>
             </div>
             <?php endif; ?>
         </div>
-        <div class="flex gap-3 pt-2">
-            <button type="submit" class="rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-5 py-2.5 transition-colors">Create package</button>
-            <a href="/whm/packages" class="rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium px-5 py-2.5 transition-colors">Cancel</a>
+        <div class="card-footer">
+            <a href="/whm/packages" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary"><?= icon($edit ? 'save' : 'plus') ?><?= $edit ? 'Save package' : 'Create package' ?></button>
         </div>
-    </form>
-</div>
-</div>
+    </div>
+</form>

@@ -1,0 +1,179 @@
+<?php
+/** @var array<string,mixed> $a the account */
+/** @var array<string,mixed> $me */
+/** @var array<string,mixed> $o AccountService::overview() */
+/** @var bool $lastAdmin */
+$id = (int) $a['id'];
+$user = $a['role'] === 'user';
+$pkg = $o['package'];
+$u = $o['usage'];
+View::breadcrumbs([['Accounts', '/whm/accounts'], [(string) $a['username']]]);
+$actions = '';
+if ($user && $a['status'] === 'active') {
+    $actions .= '<form method="post" action="/whm/accounts/' . $id . '/login-as">' . Csrf::field() . '<button class="btn btn-secondary">' . icon('login') . 'Log in as ' . e($a['username']) . '</button></form>';
+}
+$actions .= '<a href="/whm/accounts/' . $id . '/edit" class="btn btn-primary">' . icon('edit') . 'Edit</a>';
+View::slot('actions', $actions);
+View::slot('desc', e(match ($a['role']) {
+    'admin' => 'Administrator: full control of the server.',
+    'reseller' => 'Reseller: manages its own hosting accounts in WHM.',
+    default => 'Hosting account' . ($o['parent'] ? ' of reseller ' . $o['parent'] : '') . '.',
+}));
+$roleLabel = ['admin' => 'Administrator', 'reseller' => 'Reseller', 'user' => 'Hosting account'][$a['role']] ?? $a['role'];
+?>
+<div class="grid grid-cols-1 items-start gap-6 xl:grid-cols-3">
+    <div class="stack xl:col-span-2">
+        <?php if ($user): ?>
+        <section class="card" aria-labelledby="usage-title">
+            <?= Ui::cardHeader('Usage', $u ? 'Measured ' . fmt_ago((string) $u['updated_at']) . ', every hour.' : 'Not measured yet - usage is counted every hour.', $pkg ? Ui::badge((string) $pkg['name'], 'accent') : Ui::badge('No package', 'warning'), id: 'usage-title') ?>
+            <div class="card-body space-y-6">
+                <?php if ($pkg): ?>
+                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <?php
+                    $used = $u ? (int) $u['files_bytes'] + (int) $u['db_bytes'] + (int) $u['mail_bytes'] : 0;
+                    $limit = (int) $pkg['disk_quota_mb'] * 1048576;
+                    $pct = $limit > 0 ? $used / $limit * 100 : 0;
+                    echo Ui::meter('Disk', fmt_bytes($used) . ' of ' . fmt_bytes($limit), $pct, Ui::usageTone($pct, !empty($u['over_disk'])),
+                        $u ? 'Files ' . fmt_bytes((int) $u['files_bytes']) . ' · databases ' . fmt_bytes((int) $u['db_bytes']) . ' · mail ' . fmt_bytes((int) $u['mail_bytes']) : '');
+                    $bw = $u && $u['bw_month'] === date('Y-m') ? (int) $u['bw_bytes'] : 0;
+                    $bwLimit = (int) $pkg['bandwidth_mb'] * 1048576;
+                    $bwPct = $bwLimit > 0 ? $bw / $bwLimit * 100 : 0;
+                    echo Ui::meter('Bandwidth this month', fmt_bytes($bw) . ' of ' . fmt_bytes($bwLimit), $bwPct, Ui::usageTone($bwPct, !empty($u['over_bandwidth'])), !empty($u['over_bandwidth']) ? 'Used up: its sites answer 509 until next month.' : '');
+                    ?>
+                </div>
+                <div class="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
+                    <?php foreach ([['Domains', 'domains', 'max_domains'], ['Databases', 'databases', 'max_databases'], ['Mailboxes', 'mailboxes', 'max_email_accounts'], ['SFTP logins', 'sftp', 'max_ftp_accounts']] as [$label, $k, $max]):
+                        $lim = (int) $pkg[$max];
+                        $p = $lim > 0 ? $o['counts'][$k] / $lim * 100 : 100; ?>
+                    <?= Ui::meter($label, $o['counts'][$k] . ' / ' . $lim, $p, $p >= 100 ? 'warning' : 'accent') ?>
+                    <?php endforeach; ?>
+                </div>
+                <?php else: ?>
+                <?= Ui::alert('This account has no package, so it can\'t create anything. Edit it to assign one.', 'warning') ?>
+                <?php endif; ?>
+            </div>
+        </section>
+
+        <section class="card" aria-labelledby="domains-title">
+            <?= Ui::cardHeader('Domains', '', id: 'domains-title') ?>
+            <?php if (!$o['domains']): ?>
+            <?= Ui::empty('No domains yet', 'The customer adds domains in their own panel - or log in as them to do it.', 'globe') ?>
+            <?php else: ?>
+            <div class="table-wrap">
+                <table class="table table-tight">
+                    <thead><tr><th scope="col">Domain</th><th scope="col">PHP</th><th scope="col" class="hidden sm:table-cell">Certificate</th><th scope="col" class="hidden md:table-cell">Added</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($o['domains'] as $d): ?>
+                    <tr>
+                        <td><a href="https://<?= e($d['domain_name']) ?>/" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 font-medium text-fg hover:text-accent-text"><?= e($d['domain_name']) ?><?= icon('external', 'h-3.5 w-3.5 text-subtle') ?></a></td>
+                        <td class="text-muted"><?= e($d['php_version'] === 'default' ? 'Default' : 'PHP ' . $d['php_version']) ?></td>
+                        <td class="hidden text-muted sm:table-cell"><?= e(['letsencrypt' => 'Let\'s Encrypt', 'self_signed' => 'Self-signed'][$d['ssl_mode']] ?? $d['ssl_mode']) ?></td>
+                        <td class="hidden text-muted md:table-cell"><?= e(fmt_ago((string) $d['created_at'])) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+        </section>
+        <?php endif; ?>
+
+        <section class="card" aria-labelledby="act-title">
+            <?= Ui::cardHeader('Recent activity', 'By this account, or done to it.', '<a href="/whm/activity?q=' . rawurlencode((string) $a['username']) . '" class="btn btn-ghost btn-sm">All' . icon('chevron-right') . '</a>', id: 'act-title') ?>
+            <?php if (!$o['activity']): ?>
+            <?= Ui::empty('Nothing recorded yet', '', 'activity') ?>
+            <?php else: ?>
+            <ul class="divide-y divide-line">
+                <?php foreach ($o['activity'] as $r): ?>
+                <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-2.5 text-sm">
+                    <span class="w-24 shrink-0 text-muted" title="<?= e((string) $r['created_at']) ?>"><?= e(fmt_ago((string) $r['created_at'])) ?></span>
+                    <span class="chip"><?= e($r['action']) ?></span>
+                    <span class="min-w-0 flex-1 truncate text-muted"><?= e((string) $r['detail']) ?><?= $r['actor_name'] && $r['actor_name'] !== $a['username'] ? ' · by ' . e($r['actor_name']) : '' ?></span>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+            <?php endif; ?>
+        </section>
+    </div>
+
+    <div class="stack">
+        <section class="card" aria-labelledby="details-title">
+            <?= Ui::cardHeader('Details', id: 'details-title') ?>
+            <dl class="dl card-body">
+                <div><dt>Status</dt><dd><?= Ui::status((string) $a['status']) ?></dd></div>
+                <div><dt>Type</dt><dd><?= e($roleLabel) ?></dd></div>
+                <div><dt>Email</dt><dd class="break-all"><?= e($a['email']) ?></dd></div>
+                <?php if (!empty($a['full_name'])): ?><div><dt>Name</dt><dd><?= e($a['full_name']) ?></dd></div><?php endif; ?>
+                <?php if ($o['parent']): ?><div><dt>Reseller</dt><dd><?= e($o['parent']) ?></dd></div><?php endif; ?>
+                <?php if ($a['role'] === 'reseller'): ?><div><dt>Accounts</dt><dd><?= (int) $o['counts']['accounts'] ?><?= $pkg && (int) $pkg['max_accounts'] > 0 ? ' of ' . (int) $pkg['max_accounts'] : '' ?></dd></div><?php endif; ?>
+                <div><dt>Two-factor</dt><dd><?= !empty($a['totp_secret_enc']) ? Ui::badge('On', 'success', true) : Ui::badge('Off', 'neutral') ?></dd></div>
+                <?php if ($user): ?>
+                <div><dt>Linux user</dt><dd><code>jp_<?= e($a['username']) ?></code></dd></div>
+                <div><dt>PHP may run programs</dt><dd><?= (int) $a['php_exec'] ? Ui::badge('Yes (exec on)', 'warning') : Ui::badge('No', 'neutral') ?></dd></div>
+                <?php endif; ?>
+                <div><dt>Created</dt><dd><?= e(date('j M Y', (int) strtotime((string) $a['created_at']))) ?></dd></div>
+            </dl>
+        </section>
+
+        <section class="card" aria-labelledby="manage-title">
+            <?= Ui::cardHeader('Manage', id: 'manage-title') ?>
+            <div class="divide-y divide-line">
+                <div class="flex items-center justify-between gap-4 px-5 py-4">
+                    <div class="min-w-0 text-sm">
+                        <p class="font-medium text-fg"><?= $a['status'] === 'active' ? 'Suspend' : 'Unsuspend' ?></p>
+                        <p class="text-muted"><?= $user ? 'Sites, mail logins, SFTP, MySQL and cron.' : 'Signs it out and blocks sign-in.' ?></p>
+                    </div>
+                    <?php if ($a['status'] === 'active'): ?>
+                    <form method="post" action="/whm/accounts/<?= $id ?>/suspend" data-confirm="Suspend <?= e($a['username']) ?>? <?= $user ? 'Its sites go offline (503), and its mail logins, SFTP, MySQL users and cron jobs stop until it\'s unsuspended.' : 'It is signed out and can\'t sign in until unsuspended.' ?>" data-confirm-action="Suspend" data-confirm-danger>
+                        <?= Csrf::field() ?>
+                        <button class="btn btn-secondary btn-sm" <?= $lastAdmin ? 'disabled title="The last active administrator can\'t be suspended"' : '' ?>><?= icon('pause') ?>Suspend</button>
+                    </form>
+                    <?php else: ?>
+                    <form method="post" action="/whm/accounts/<?= $id ?>/unsuspend">
+                        <?= Csrf::field() ?>
+                        <button class="btn btn-secondary btn-sm"><?= icon('play') ?>Unsuspend</button>
+                    </form>
+                    <?php endif; ?>
+                </div>
+
+                <?php if (($me['role'] ?? '') === 'admin' && !empty($a['totp_secret_enc'])): ?>
+                <div class="flex items-center justify-between gap-4 px-5 py-4">
+                    <div class="min-w-0 text-sm">
+                        <p class="font-medium text-fg">Reset two-factor</p>
+                        <p class="text-muted">For a lost phone. Their recovery codes stop working too.</p>
+                    </div>
+                    <form method="post" action="/whm/accounts/<?= $id ?>/reset-2fa" data-confirm="Turn off two-factor sign-in for <?= e($a['username']) ?>? They sign in with only their password until they set it up again." data-confirm-action="Reset two-factor">
+                        <?= Csrf::field() ?>
+                        <button class="btn btn-secondary btn-sm"><?= icon('shield') ?>Reset</button>
+                    </form>
+                </div>
+                <?php endif; ?>
+
+                <?php if (($me['role'] ?? '') === 'admin' && $user): ?>
+                <div class="flex items-center justify-between gap-4 px-5 py-4">
+                    <div class="min-w-0 text-sm">
+                        <p class="font-medium text-fg">PHP can run programs</p>
+                        <p class="text-muted">exec(), proc_open() and friends. Only for software that needs it.</p>
+                    </div>
+                    <form method="post" action="/whm/accounts/<?= $id ?>/php-exec" data-confirm="<?= (int) $a['php_exec'] ? 'Stop ' . e($a['username']) . '\'s PHP from running programs?' : 'Let ' . e($a['username']) . '\'s PHP run programs (exec, proc_open...)? Only for software that needs it.' ?>" data-confirm-action="<?= (int) $a['php_exec'] ? 'Turn off' : 'Turn on' ?>">
+                        <?= Csrf::field() ?>
+                        <input type="hidden" name="allow" value="<?= (int) $a['php_exec'] ? '' : '1' ?>">
+                        <button class="btn btn-secondary btn-sm"><?= (int) $a['php_exec'] ? 'Turn off' : 'Turn on' ?></button>
+                    </form>
+                </div>
+                <?php endif; ?>
+
+                <div class="flex items-center justify-between gap-4 px-5 py-4">
+                    <div class="min-w-0 text-sm">
+                        <p class="font-medium text-danger-text">Delete account</p>
+                        <p class="text-muted"><?= $user ? 'Domains, databases, mailboxes and SFTP logins go too.' : ($a['role'] === 'reseller' ? 'Its hosting accounts stay, owned by the administrators.' : 'Removes this administrator login.') ?></p>
+                    </div>
+                    <form method="post" action="/whm/accounts/<?= $id ?>/delete" data-confirm="Permanently delete <?= e($a['username']) ?><?= $user ? ' and all of its domains, databases, mailboxes and SFTP accounts? Its site files are moved to /var/lib/jinnpanel/removed/ (root only).' : '?' ?> This can't be undone." data-confirm-action="Delete <?= e($a['username']) ?>" data-confirm-danger>
+                        <?= Csrf::field() ?>
+                        <button class="btn btn-danger btn-sm" <?= $lastAdmin ? 'disabled title="The last active administrator can\'t be deleted"' : '' ?>><?= icon('trash') ?>Delete</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>

@@ -99,6 +99,8 @@ final class DomainController
             exit;
         }
 
+        // The domain's own page sends back=domain; the list (older views) doesn't.
+        $back = ($_POST['back'] ?? '') === 'domain' ? "/cpanel/domains/$id" : '/cpanel/domains';
         $phpVersion = self::validPhpVersion((string) ($_POST['php_version'] ?? $domain['php_version']));
         // Only the SSL form sends ssl_mode; the PHP version form keeps it as it is.
         $sslRequested = isset($_POST['ssl_mode']) ? (string) $_POST['ssl_mode'] : null;
@@ -113,7 +115,7 @@ final class DomainController
         } catch (Throwable $e) {
             error_log($e->getMessage());
             Flash::error('Could not update the vhost: ' . $e->getMessage());
-            header('Location: /cpanel/domains');
+            header('Location: ' . $back);
             exit;
         }
 
@@ -122,7 +124,7 @@ final class DomainController
         AccountRuntime::sync((int) $me['id']); // a pool in the new PHP version's FPM
 
         Flash::ok("Settings updated for \"{$domain['domain_name']}\".");
-        header('Location: /cpanel/domains');
+        header('Location: ' . $back);
         exit;
     }
 
@@ -194,6 +196,7 @@ final class DomainController
             'php' => PhpSettingsService::get($d),
             'aliases' => DomainAliasService::forDomain((string) $d['domain_name']),
             'phpLog' => PhpSettingsService::logFile((string) $d['domain_name']),
+            'phpVersions' => PhpVersionService::selectable(),
         ], 'cpanel');
     }
 
