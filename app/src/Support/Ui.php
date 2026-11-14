@@ -95,6 +95,65 @@ final class Ui
     }
 
     /**
+     * A labelled password input with a show/hide button and a caps lock
+     * warning (both need pages/auth.js: View::script('auth')). Options:
+     *  id, required, autocomplete (default current-password), autofocus, minlength,
+     *  hint, strength (a strength meter, for a new password; "too short" is under
+     *  minlength, default Passwords::MIN_LENGTH), generate (password generator
+     *  button), link ([href, text] beside the label, e.g. "Forgot it?"), attrs.
+     * Without JavaScript it is a plain password input with its label and hint.
+     *
+     * @param array<string,mixed> $o
+     */
+    public static function password(string $name, string $label, array $o = []): string
+    {
+        $id = (string) ($o['id'] ?? self::id('pw'));
+        $hintId = $id . '-hint';
+        $strength = !empty($o['strength']);
+        $attrs = [
+            'type' => 'password',
+            'name' => $name,
+            'id' => $id,
+            'required' => !empty($o['required']),
+            'minlength' => isset($o['minlength']) ? (string) $o['minlength'] : null,
+            'autocomplete' => (string) ($o['autocomplete'] ?? 'current-password'),
+            'autofocus' => !empty($o['autofocus']),
+            'aria-describedby' => !empty($o['hint']) ? $hintId : null,
+            'class' => 'input pr-11',
+            'data-password' => true,
+            'data-strength-min' => $strength ? (string) ($o['minlength'] ?? Passwords::MIN_LENGTH) : null,
+        ] + ($o['attrs'] ?? []);
+
+        if (!empty($o['link'])) {
+            [$href, $text] = $o['link'];
+            $labelHtml = '<div class="mb-1.5 flex items-baseline justify-between gap-3"><label for="' . e($id) . '" class="text-[13px] font-medium text-fg">' . e($label) . '</label>'
+                . '<a href="' . e((string) $href) . '" class="link text-[13px]">' . e((string) $text) . '</a></div>';
+        } else {
+            $labelHtml = '<label for="' . e($id) . '" class="label">' . e($label) . '</label>';
+        }
+
+        // Hidden until auth.js runs: without it the button would do nothing.
+        $reveal = '<button type="button" class="pw-reveal" aria-label="Show password" aria-pressed="false" aria-controls="' . e($id) . '" data-reveal hidden>'
+            . '<span data-reveal-icon="show">' . icon('eye') . '</span><span data-reveal-icon="hide" hidden>' . icon('eye-off') . '</span></button>';
+        $control = '<div class="relative min-w-0 flex-1"><input' . self::attrs($attrs) . '>' . $reveal . '</div>';
+        if (!empty($o['generate'])) {
+            $control = '<div class="flex gap-2">' . $control
+                . '<button type="button" class="btn btn-secondary h-10 shrink-0" data-generate-password="' . e($id) . '" title="Generate a strong password">'
+                . icon('key') . '<span class="sr-only sm:not-sr-only">Generate</span></button></div>';
+        }
+
+        // The live region stays in place; only its message shows and hides, so it is announced.
+        $caps = '<div role="status"><p class="field-error flex items-center gap-1.5" hidden data-caps>' . icon('alert', 'h-3.5 w-3.5 shrink-0') . 'Caps lock is on</p></div>';
+        $meter = $strength
+            ? '<div class="pw-meter" data-strength hidden><div class="pw-meter-bars" aria-hidden="true"><span></span><span></span><span></span><span></span></div>'
+                . '<p class="pw-meter-label" aria-live="polite" aria-atomic="true"><span class="sr-only">Password strength: </span><span data-strength-label></span></p></div>'
+            : '';
+        $hint = !empty($o['hint']) ? '<p id="' . e($hintId) . '" class="hint">' . e((string) $o['hint']) . '</p>' : '';
+
+        return '<div class="field">' . $labelHtml . $control . $caps . $meter . $hint . '</div>';
+    }
+
+    /**
      * A labelled select. $options: value => label, or value => [label, disabled].
      *
      * @param array<string|int, string|array{0:string,1?:bool}> $options

@@ -66,6 +66,10 @@
 
         --jp-shadow-card: none;
         --jp-shadow-pop: 0 18px 44px -14px rgb(17 20 27 / 0.28), 0 0 0 1px rgb(17 20 27 / 0.06);
+
+        /* The sign-in brand panel: deep violet ink and a light violet, the same in both themes. */
+        --jp-brand-ink: 21 17 58;
+        --jp-brand-dot: 169 150 255;
     }
 
     :root[data-theme="dark"] {
@@ -354,8 +358,44 @@
     .dialog-text { @apply mt-2 whitespace-pre-line text-sm text-muted; }
     .dialog-footer { @apply flex flex-wrap justify-end gap-2 rounded-b-[14px] border-t border-line bg-surface-2 px-6 py-3.5; }
 
-    /* Auth pages */
-    .auth-card { @apply card p-6 sm:p-8; }
+    /* Sign-in and error pages (layouts/auth.php, layouts/blank.php) */
+    .auth-brand { @apply text-white; background-color: rgb(var(--jp-brand-ink)); container-type: inline-size; }
+    /* The server name fills the panel on one line when it can (--host-chars is its length; a
+       Plex Mono character is 0.6em wide), then breaks after a dot. Older browsers use the vw size. */
+    .auth-host {
+        @apply font-mono text-[clamp(2.2rem,4.4vw,3.6rem)] font-medium leading-[1.05] tracking-[-0.03em];
+        font-size: clamp(1.75rem, calc(100cqi / (var(--host-chars, 18) * 0.6)), 3.6rem);
+        overflow-wrap: anywhere;
+    }
+    .auth-dot { color: rgb(var(--jp-brand-dot)); }
+    .auth-title { @apply text-[1.625rem] font-semibold leading-tight tracking-[-0.015em] text-fg; }
+    .auth-desc { @apply mt-1.5 text-[14px] text-muted; }
+    .auth-icon { @apply mb-6 flex h-11 w-11 items-center justify-center rounded-[10px]; }
+    .auth-icon > svg { @apply h-5 w-5; }
+    .auth-submit { @apply btn btn-primary btn-block h-10 text-[14px]; }
+    .error-code { @apply font-mono text-[clamp(3.5rem,14vw,5.5rem)] font-medium leading-none tracking-[-0.04em] text-accent-text; }
+
+    /* Password fields (Ui::password, pages/auth.js): show/hide, caps lock, strength */
+    .pw-reveal { @apply absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-[6px] text-subtle hover:bg-surface-3 hover:text-fg; }
+    .pw-reveal svg { @apply h-4 w-4; }
+    .pw-meter { @apply mt-2 flex items-center gap-3; }
+    .pw-meter-bars { @apply grid flex-1 grid-cols-4 gap-1; }
+    .pw-meter-bars > span { @apply h-1 rounded-full bg-line-strong/60 transition-colors; }
+    .pw-meter-label { @apply w-16 shrink-0 text-right text-[12.5px] font-medium text-muted; }
+    .pw-meter[data-level="1"] .pw-meter-bars > span:nth-child(-n+1) { @apply bg-danger; }
+    .pw-meter[data-level="1"] .pw-meter-label { @apply text-danger-text; }
+    .pw-meter[data-level="2"] .pw-meter-bars > span:nth-child(-n+2) { @apply bg-warning; }
+    .pw-meter[data-level="3"] .pw-meter-bars > span:nth-child(-n+3) { @apply bg-success; }
+    .pw-meter[data-level="4"] .pw-meter-bars > span { @apply bg-success; }
+
+    /* A one-time code as six boxes (pages/two-factor.js builds them over the real input) */
+    .otp { @apply flex items-center gap-2; }
+    .otp-box {
+        @apply h-12 w-full min-w-0 max-w-[3rem] flex-1 rounded-[8px] border border-line-strong bg-surface p-0 text-center font-mono text-[20px] font-medium text-fg caret-accent
+               transition-colors focus:border-accent focus:outline-none focus:ring-[3px] focus:ring-accent/20;
+    }
+    .otp-box:nth-child(4) { @apply ml-2; }
+    .otp-box[aria-invalid="true"] { @apply border-danger focus:ring-danger/20; }
 
     /* Charts (src/Support/Chart.php, assets/js/pages/charts.js) */
     .chart { @apply relative; }

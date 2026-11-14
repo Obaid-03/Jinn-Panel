@@ -149,7 +149,8 @@ require PREVIEW_APP . '/src/View.php';
  *   role     'admin' | 'reseller' | 'user' | 'guest'
  *   path     the URL the page lives at (for the active menu item and links)
  *   data     the variables the controller passes
- *   variants name => data overrides (e.g. 'empty' => ['domains' => []])
+ *   variants name => data overrides (e.g. 'empty' => ['domains' => []]), or
+ *            ['data' => [...], 'flash' => [...], 'role' => ..., 'features' => [...]]
  *   flash    list of [type, message] to show
  *   session  extra $_SESSION entries
  *   features what the account's package leaves out, e.g. ['cron' => false]
@@ -184,6 +185,9 @@ function preview_render(string $view, array $fx, ?string $variant = null, ?strin
     if ($variant !== null) {
         $v = $fx['variants'][$variant] ?? throw new RuntimeException("No variant '$variant' for $view");
         $data = array_replace($data, $v['data'] ?? $v);
+        foreach ($v['flash'] ?? [] as [$type, $msg]) {
+            $_SESSION['flash'][] = ['type' => $type, 'message' => $msg];
+        }
         if (isset($v['role'])) {
             $fx['role'] = $v['role'];
         }

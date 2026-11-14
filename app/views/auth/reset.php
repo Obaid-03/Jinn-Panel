@@ -2,27 +2,31 @@
 /** @var string|null $token null = the link isn't valid (any more) */
 /** @var array<string,mixed>|null $row the account */
 /** @var string|null $error */
+$welcome = ($row['purpose'] ?? '') === 'welcome';
+if ($token !== null) {
+    View::script('auth');
+}
 ?>
-<div class="auth-card">
-    <?php if ($token === null): ?>
-    <div class="mb-5 flex h-11 w-11 items-center justify-center rounded-full bg-warning-soft text-warning-text"><?= icon('clock', 'h-5 w-5') ?></div>
-    <h1 class="text-xl font-semibold tracking-tight text-fg">This link no longer works</h1>
-    <p class="mt-2 text-sm text-muted">Password links work once, and only for a limited time. Ask for a new one.</p>
-    <a href="/login/forgot" class="btn btn-primary btn-block mt-6">Send a new link</a>
-    <p class="mt-4 text-center text-sm"><a href="/login" class="link-muted">Back to sign in</a></p>
-    <?php else: ?>
-    <h1 class="text-xl font-semibold tracking-tight text-fg"><?= ($row['purpose'] ?? '') === 'welcome' ? 'Choose your password' : 'Choose a new password' ?></h1>
-    <p class="mt-1 text-sm text-muted">For <span class="font-medium text-fg"><?= e((string) $row['username']) ?></span>. Other signed-in sessions will be signed out.</p>
-    <?php if (!empty($error)): ?>
-    <div class="mt-5"><?= Ui::alert($error, 'danger') ?></div>
-    <?php endif; ?>
-    <form method="post" action="/login/reset" class="mt-6 space-y-4">
-        <?= Csrf::field() ?>
-        <input type="hidden" name="token" value="<?= e($token) ?>">
-        <input type="text" name="username" value="<?= e((string) $row['username']) ?>" autocomplete="username" class="sr-only" tabindex="-1" aria-label="Username" readonly>
-        <?= Ui::field('new_password', 'New password', ['type' => 'password', 'required' => true, 'generate' => true, 'hint' => 'At least ' . Passwords::MIN_LENGTH . ' characters, not a common password.', 'attrs' => ['minlength' => Passwords::MIN_LENGTH, 'autocomplete' => 'new-password', 'autofocus' => true]]) ?>
-        <?= Ui::field('new_password_confirm', 'New password again', ['type' => 'password', 'required' => true, 'attrs' => ['minlength' => Passwords::MIN_LENGTH, 'autocomplete' => 'new-password']]) ?>
-        <button type="submit" class="btn btn-primary btn-block py-2.5">Save password</button>
-    </form>
-    <?php endif; ?>
-</div>
+<?php if ($token === null): ?>
+<div class="auth-icon bg-warning-soft text-warning-text"><?= icon('clock') ?></div>
+<h1 class="auth-title">This link no longer works</h1>
+<p class="mt-3 text-[14px] text-muted">Password links work once, and only for a limited time. Ask for a new one.</p>
+<a href="/login/forgot" class="auth-submit mt-8">Send a new link</a>
+<p class="mt-6 text-[13px]"><a href="/login" class="link-muted inline-flex items-center gap-1.5"><?= icon('arrow-left', 'h-3.5 w-3.5') ?>Back to sign in</a></p>
+<?php else: ?>
+<h1 class="auth-title"><?= $welcome ? 'Choose your password' : 'Choose a new password' ?></h1>
+<p class="auth-desc">For <span class="font-medium text-fg"><?= e((string) $row['username']) ?></span>.<?= $welcome ? ' You sign in with it from now on.' : ' Other signed-in sessions will be signed out.' ?></p>
+
+<?php if (!empty($error)): ?>
+<div class="mt-6"><?= Ui::alert($error, 'danger') ?></div>
+<?php endif; ?>
+
+<form method="post" action="/login/reset" class="mt-8 space-y-5">
+    <?= Csrf::field() ?>
+    <input type="hidden" name="token" value="<?= e($token) ?>">
+    <input type="text" name="username" value="<?= e((string) $row['username']) ?>" autocomplete="username" class="sr-only" tabindex="-1" aria-label="Username" readonly>
+    <?= Ui::password('new_password', 'New password', ['required' => true, 'strength' => true, 'generate' => true, 'minlength' => Passwords::MIN_LENGTH, 'autocomplete' => 'new-password', 'autofocus' => true, 'hint' => 'At least ' . Passwords::MIN_LENGTH . ' characters, not a common password.']) ?>
+    <?= Ui::password('new_password_confirm', 'New password again', ['required' => true, 'minlength' => Passwords::MIN_LENGTH, 'autocomplete' => 'new-password']) ?>
+    <button type="submit" class="auth-submit">Save password</button>
+</form>
+<?php endif; ?>

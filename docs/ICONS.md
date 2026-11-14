@@ -54,7 +54,8 @@ The panel's interface uses a small hand-authored set of stroke icons (24x24, `st
 | external | `external.svg` | Open in a new tab |
 | login | `login.svg` | Log in as |
 | logout | `logout.svg` | Sign out |
-| eye | `eye.svg` | Viewing as another account |
+| eye | `eye.svg` | Viewing as another account, show a password |
+| eye-off | `eye-off.svg` | Hide a shown password |
 | pause | `pause.svg` | Suspend |
 | play | `play.svg` | Unsuspend |
 | check | `check.svg` | Done, all clear |

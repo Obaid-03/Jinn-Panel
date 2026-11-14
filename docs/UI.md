@@ -94,6 +94,10 @@ themes: a chart's first series is always `s1`, a fifth and later fold into
 Never use a status colour for a series, or a series colour for status.
 `--jp-chart-grid` and `--jp-chart-axis` draw the recessive grid and baseline.
 
+`--jp-brand-ink` and `--jp-brand-dot` are the deep violet of the sign-in
+brand panel and the light violet of the dots in the server name; they are
+the same in both themes and used only there (`auth-brand`, `auth-dot`).
+
 ## Component classes
 
 Plain CSS classes (in `@layer components`), used directly in views:
@@ -119,6 +123,9 @@ Plain CSS classes (in `@layer components`), used directly in views:
 | `disclosure` | a styled `<details>` |
 | `menu`, `menu-panel`, `menu-item` | a dropdown (`<details class="menu" data-menu>`) |
 | `dialog`, `dialog-body`, `dialog-title`, `dialog-text`, `dialog-footer` | a `<dialog>` opened with `data-dialog-open` |
+| `auth-title`, `auth-desc`, `auth-icon`, `auth-submit`, `error-code` | sign-in and error pages: heading, line under it, round-cornered icon tile, full-width submit button, the big status code (the layouts draw `auth-brand`, `auth-host`, `auth-dot`) |
+| `pw-reveal`, `pw-meter` | show/hide button and strength meter, drawn by `Ui::password()` |
+| `otp`, `otp-box` | a one-time code as six boxes, built by `pages/two-factor.js` |
 | `js-hide` | hidden only when JavaScript runs (a page script shows it) - for no-JS fallbacks |
 
 ## PHP helpers (`Ui::`)
@@ -129,6 +136,7 @@ Plain CSS classes (in `@layer components`), used directly in views:
 |---|---|
 | `Ui::field($name, $label, [...])` | labelled input with `hint`, `error`, `required`, `optional`, `mono`, `addon` / `suffix`, `generate` (password generator), `attrs`. Refills from the last failed submit. |
 | `Ui::select($name, $label, $options, $selected, [...])`, `Ui::textarea(...)`, `Ui::checkbox(...)` | the same for other controls |
+| `Ui::password($name, $label, [...])` | password input with a show/hide button and a caps lock warning; `strength` adds a meter for a new password ("too short" below `minlength`, default `Passwords::MIN_LENGTH`), `generate`, `hint`, `link` (`[href, text]` beside the label), `autocomplete`. Needs `View::script('auth')`; without JavaScript it is a plain password input |
 | `Ui::pageHeader()`, `Ui::cardHeader($title, $desc, $actionsHtml, id: '...')` | headings; `id` for a section's `aria-labelledby` |
 | `Ui::badge($text, $tone, $dot)`, `Ui::status($word)` | pills; `status` picks the tone from words like active, failed, pending |
 | `Ui::progress($pct, $label, $tone)`, `Ui::meter($label, $value, $pct, $tone, $note)`, `Ui::usageTone($pct)` | bars |
@@ -202,6 +210,14 @@ Typical page: optional summary (`stat`s or a usage card), then cards in a
 "create" form sits in a card beside the list (`xl:grid-cols-3`, list
 `xl:col-span-2`) with `id` so header actions can link to it.
 
+Signed-out pages (sign in, two-factor, forgot and reset password, setup)
+use `layouts/auth.php`: the brand panel with the server's name beside the
+form on wide screens, only the form on phones. A view starts with an
+`auth-title` heading and can set `View::slot('title', 'Tab title')` (plain
+text), `'wide'` (a wider form column), `'brand_lead'` and `'brand_note'`
+(raw HTML). Error pages (404, 419, 500) use `layouts/blank.php`, which
+needs no session or database, and name the tab the same way.
+
 ## Behaviour (`app.js`)
 
 All behaviour hangs off data attributes, so views have no inline scripts:
@@ -222,6 +238,16 @@ All behaviour hangs off data attributes, so views have no inline scripts:
 Page-specific code goes in `public/assets/js/pages/<name>.js`, loaded with
 `View::script('<name>')`. Pass values to it through `data-` attributes or a
 `<script type="application/json">` block, never inline JavaScript.
+Two of them are shared by the sign-in pages:
+
+| Script | Attribute | |
+|---|---|---|
+| `auth` | `button[data-reveal][aria-controls="<input id>"]` | show/hide a password; its name switches between "Show password" and "Hide password", with `aria-pressed` |
+| `auth` | `input[data-password]` + `[data-caps]` in its `.field` | "Caps lock is on" under the field while it is (in a `role="status"` region) |
+| `auth` | `input[data-strength-min="10"]` + `[data-strength]` in its `.field` | strength meter: 4 bars and a word (Too short, Weak, Fair, Strong) from length and kinds of characters; "too short" counts bytes like the server. A guide only, it never blocks sending |
+| `two-factor` | `input[data-otp]` | the real code input becomes hidden and six `otp-box`es fill it: typing moves on, Backspace goes back, arrows move, a pasted code fills them all, the form sends itself at the sixth digit. Without JavaScript the input stays as it is |
+
+`Ui::password()` writes the `auth` attributes for you.
 `window.JP` offers `confirm({title, text, action, danger})` and
 `prompt({title, label, value})` (both return Promises) and `toast(msg, 'error'?)`.
 

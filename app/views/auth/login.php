@@ -1,22 +1,21 @@
-<?php /** @var string|null $error */ ?>
-<div class="auth-card">
-    <h1 class="text-xl font-semibold tracking-tight text-fg">Sign in</h1>
-    <p class="mt-1 text-sm text-muted">to your hosting control panel.</p>
+<?php
+/** @var string|null $error */
+View::script('auth');
+// After a failed attempt the username stays, so only the password is typed again.
+$username = !empty($error) && is_string($_POST['username'] ?? null) ? trim($_POST['username']) : '';
+?>
+<h1 class="auth-title">Sign in</h1>
+<p class="auth-desc">With your username or email address.</p>
 
-    <?php if (!empty($error)): ?>
-    <div class="mt-5"><?= Ui::alert($error, 'danger') ?></div>
-    <?php endif; ?>
+<?php if (!empty($error)): ?>
+<div class="mt-6"><?= Ui::alert($error, 'danger') ?></div>
+<?php endif; ?>
 
-    <form method="post" action="/login" class="mt-6 space-y-4">
-        <?= Csrf::field() ?>
-        <?= Ui::field('username', 'Username or email', ['required' => true, 'attrs' => ['autofocus' => true, 'autocomplete' => 'username', 'autocapitalize' => 'off', 'spellcheck' => 'false']]) ?>
-        <div>
-            <div class="mb-1.5 flex items-baseline justify-between">
-                <label for="login-password" class="text-sm font-medium text-fg">Password</label>
-                <a href="/login/forgot" class="text-sm link">Forgot it?</a>
-            </div>
-            <input type="password" name="password" id="login-password" required autocomplete="current-password" class="input">
-        </div>
-        <button type="submit" class="btn btn-primary btn-block py-2.5">Sign in</button>
-    </form>
-</div>
+<form method="post" action="/login" class="mt-8 space-y-5">
+    <?= Csrf::field() ?>
+    <?= Ui::field('username', 'Username or email', ['required' => true, 'value' => $username !== '' ? $username : null, 'attrs' => ['autofocus' => $username === '', 'autocomplete' => 'username', 'autocapitalize' => 'off', 'spellcheck' => 'false']]) ?>
+    <?= Ui::password('password', 'Password', ['id' => 'login-password', 'required' => true, 'autocomplete' => 'current-password', 'autofocus' => $username !== '', 'link' => ['/login/forgot', 'Forgot it?']]) ?>
+    <button type="submit" class="auth-submit">Sign in</button>
+</form>
+
+<p class="mt-8 text-[13px] text-subtle">Two-factor codes are asked for on the next step, if you turned them on.</p>
