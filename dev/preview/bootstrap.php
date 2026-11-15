@@ -199,6 +199,8 @@ function preview_render(string $view, array $fx, ?string $variant = null, ?strin
     $GLOBALS['preview_quota'] = $fx['quota'] ?? null;
     Auth::as($role ?? ($fx['role'] ?? 'user'));
     // What the hosting account's package includes (fixture 'features' => [key => false, ...]).
+    // Panel settings the layout reads (the alerts bell's count), without a database.
+    (new ReflectionProperty(Settings::class, 'cache'))->setValue(null, ['alerts_summary' => json_encode(['count' => 5, 'level' => 'danger', 'at' => time()])] + ($fx['settings'] ?? []));
     Features::forget();
     if (Auth::id() !== null) {
         Features::prime((int) Auth::id(), $features);
